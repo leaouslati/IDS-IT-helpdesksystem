@@ -9,3 +9,13 @@ A modern web-based IT Help Desk and Ticketing Management System built as part of
 - **Database:** SQL Server 2025 Express
 - **Authentication:** JWT
 - **Version Control:** Git & GitHub
+
+
+## System Users & Roles
+ 
+| Role | Description |
+|---|---|
+| Admin | Full system access, manages users and settings |
+| IT Support Agent | Manages and resolves tickets |
+| Employee | Creates and tracks their own tickets |
+| Manager | Monitors team tickets and reports |
