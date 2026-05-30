@@ -1,26 +1,57 @@
 import { createRouter, createWebHistory } from "vue-router";
-import HomeView from "../views/HomeView.vue";
+import { useAuthStore } from "../store/auth";
 
 const routes = [
   {
     path: "/",
-    name: "home",
-    component: HomeView,
+    redirect: "/login",
   },
   {
-    path: "/about",
-    name: "about",
-    // route level code-splitting
-    // this generates a separate chunk (about.[hash].js) for this route
-    // which is lazy-loaded when the route is visited.
-    component: () =>
-      import(/* webpackChunkName: "about" */ "../views/AboutView.vue"),
+    path: "/login",
+    name: "Login",
+    component: () => import("../views/LoginView.vue"),
+    meta: { requiresGuest: true },
+  },
+  {
+    path: "/dashboard",
+    name: "Dashboard",
+    component: () => import("../views/DashboardView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/unauthorized",
+    name: "Unauthorized",
+    component: () => import("../views/UnauthorizedView.vue"),
+  },
+  {
+    path: "/:pathMatch(.*)*",
+    name: "NotFound",
+    component: () => import("../views/NotFoundView.vue"),
   },
 ];
 
 const router = createRouter({
-  history: createWebHistory(process.env.BASE_URL),
+  history: createWebHistory(),
   routes,
+});
+
+// Route guard - runs before every page loads
+router.beforeEach((to, from, next) => {
+  const authStore = useAuthStore();
+
+  // If page requires auth and user is not logged in
+  if (to.meta.requiresAuth && !authStore.isLoggedIn) {
+    next("/login");
+    return;
+  }
+
+  // If page requires guest and user is already logged in
+  if (to.meta.requiresGuest && authStore.isLoggedIn) {
+    next("/dashboard");
+    return;
+  }
+
+  next();
 });
 
 export default router;
