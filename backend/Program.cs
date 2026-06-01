@@ -18,6 +18,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // Register AuthService
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<DashboardService>();
 
 // Add JWT Authentication
 var jwtKey = builder.Configuration["Jwt:Key"]!;
@@ -45,8 +46,8 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowVue", policy =>
     {
-        policy.WithOrigins("http://localhost:5173")
-              .AllowAnyHeader()
+        policy.WithOrigins("http://localhost:5173", "http://localhost:8080")
+               .AllowAnyHeader()
               .AllowAnyMethod();
     });
 });
