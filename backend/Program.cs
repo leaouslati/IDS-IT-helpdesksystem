@@ -16,7 +16,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Register AuthService
+// Register services
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<DashboardService>();
 
@@ -54,11 +54,37 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Auto create database and seed data
+// Auto create database, apply schema additions, and seed data
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
+
+    // Add Departments table if it doesn't exist yet
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Departments')
+        CREATE TABLE Departments (
+            Id int NOT NULL IDENTITY PRIMARY KEY,
+            Name nvarchar(max) NOT NULL,
+            ManagerId int NULL,
+            CONSTRAINT FK_Departments_Users_ManagerId FOREIGN KEY (ManagerId) REFERENCES Users(Id)
+        )");
+
+    // Add DepartmentId column to Users if not present
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Users') AND name = 'DepartmentId')
+        ALTER TABLE Users ADD DepartmentId int NULL");
+
+    // Add DepartmentId column to Tickets if not present
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Tickets') AND name = 'DepartmentId')
+        ALTER TABLE Tickets ADD DepartmentId int NULL");
+
+    // Add AssignedToUserId column to Tickets if not present
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Tickets') AND name = 'AssignedToUserId')
+        ALTER TABLE Tickets ADD AssignedToUserId int NULL");
+
     await DbSeeder.SeedAsync(db);
 }
 

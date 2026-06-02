@@ -56,4 +56,13 @@ namespace backend.DTOs
         public bool IsRead { get; set; }
         public DateTime CreatedAt { get; set; }
     }
+
+    public class AgentAvailabilityDto
+    {
+        public int UserId { get; set; }
+        public string AgentName { get; set; } = string.Empty;
+        public int OpenTickets { get; set; }
+        public int ResolvedThisWeek { get; set; }
+        public bool IsAvailable { get; set; }
+    }
 }

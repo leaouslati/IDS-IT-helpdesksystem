@@ -12,6 +12,7 @@ namespace backend.DTOs
         public int EscalatedTickets { get; set; }
         public List<TicketTrendDto> TicketTrend { get; set; } = new();
         public List<CategoryBreakdownDto> CategoryBreakdown { get; set; } = new();
+        public List<PriorityBreakdownDto> PriorityBreakdown { get; set; } = new();
         public List<RecentActivityDto> RecentActivity { get; set; } = new();
         public List<RecentTicketDto> RecentTickets { get; set; } = new();
     }

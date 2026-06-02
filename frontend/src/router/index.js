@@ -1,6 +1,16 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore } from "../store/auth";
 
+export function getRoleDashboard(role) {
+  const map = {
+    Admin: "/dashboard/admin",
+    Manager: "/dashboard/manager",
+    Agent: "/dashboard/agent",
+    Employee: "/dashboard/employee",
+  };
+  return map[role] || "/dashboard/admin";
+}
+
 const routes = [
   {
     path: "/",
@@ -14,9 +24,34 @@ const routes = [
   },
   {
     path: "/dashboard",
-    name: "Dashboard",
-    component: () => import("../views/DashboardView.vue"),
-    meta: { requiresAuth: true },
+    redirect: () => {
+      const authStore = useAuthStore();
+      return getRoleDashboard(authStore.userRole);
+    },
+  },
+  {
+    path: "/dashboard/admin",
+    name: "AdminDashboard",
+    component: () => import("../views/dashboards/AdminDashboard.vue"),
+    meta: { requiresAuth: true, roles: ["Admin"] },
+  },
+  {
+    path: "/dashboard/manager",
+    name: "ManagerDashboard",
+    component: () => import("../views/dashboards/ManagerDashboard.vue"),
+    meta: { requiresAuth: true, roles: ["Manager"] },
+  },
+  {
+    path: "/dashboard/agent",
+    name: "AgentDashboard",
+    component: () => import("../views/dashboards/AgentDashboard.vue"),
+    meta: { requiresAuth: true, roles: ["Agent"] },
+  },
+  {
+    path: "/dashboard/employee",
+    name: "EmployeeDashboard",
+    component: () => import("../views/dashboards/EmployeeDashboard.vue"),
+    meta: { requiresAuth: true, roles: ["Employee"] },
   },
   {
     path: "/unauthorized",
@@ -35,19 +70,26 @@ const router = createRouter({
   routes,
 });
 
-// Route guard - runs before every page loads
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, _from, next) => {
   const authStore = useAuthStore();
 
-  // If page requires auth and user is not logged in
   if (to.meta.requiresAuth && !authStore.isLoggedIn) {
     next("/login");
     return;
   }
 
-  // If page requires guest and user is already logged in
   if (to.meta.requiresGuest && authStore.isLoggedIn) {
-    next("/dashboard");
+    next(getRoleDashboard(authStore.userRole));
+    return;
+  }
+
+  // Role-based access check
+  if (
+    to.meta.roles &&
+    authStore.userRole &&
+    !to.meta.roles.includes(authStore.userRole)
+  ) {
+    next(getRoleDashboard(authStore.userRole));
     return;
   }
 

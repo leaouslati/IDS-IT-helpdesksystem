@@ -11,5 +11,7 @@
         public Role Role { get; set; } = null!;
         public bool IsActive { get; set; } = true;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public int? DepartmentId { get; set; }
+        public Department? Department { get; set; }
     }
 }

@@ -6,7 +6,8 @@ namespace backend.DTOs
         public int ResolvedToday { get; set; }
         public int PendingResponse { get; set; }
         public int ResolvedThisWeek { get; set; }
-        public List<RecentTicketDto> MyActiveTickets { get; set; } = new();
+        public int EscalatedCount { get; set; }
+        public List<RecentTicketDto> MyTickets { get; set; } = new();
         public List<RecentActivityDto> RecentActivity { get; set; } = new();
     }
 }

@@ -29,7 +29,8 @@ namespace backend.Controllers
         [Authorize(Roles = "Manager")]
         public async Task<IActionResult> GetManagerDashboard()
         {
-            var result = await _dashboardService.GetManagerDashboardAsync();
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            var result = await _dashboardService.GetManagerDashboardAsync(userId);
             return Ok(result);
         }
 

@@ -95,6 +95,7 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "../store/auth";
+import { getRoleDashboard } from "../router";
 import { Eye, EyeOff } from "lucide-vue-next";
 
 const router = useRouter();
@@ -111,8 +112,8 @@ async function handleLogin() {
   loading.value = true;
 
   try {
-    await authStore.login(email.value, password.value);
-    router.push("/dashboard");
+    const role = await authStore.login(email.value, password.value);
+    router.push(getRoleDashboard(role));
   } catch (error) {
     errorMessage.value = "Invalid credentials. Please try again.";
   } finally {
