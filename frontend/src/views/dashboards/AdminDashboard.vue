@@ -201,7 +201,7 @@
         </div>
       </div>
 
-      <!-- Recent tickets table — full width -->
+      <!-- Recent tickets table -->
       <TicketTable
         title="Recent Tickets"
         :tickets="processedTickets"

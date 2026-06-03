@@ -76,13 +76,14 @@
         />
       </div>
 
-      <!-- Two-column: active tickets + quick actions -->
+      <!--active tickets + quick actions -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div class="lg:col-span-2">
           <TicketTable
             title="Tickets Assigned to Me"
             :tickets="processedTickets"
             :columns="ticketColumns"
+            @action-click="startWorking"
           />
         </div>
 
@@ -190,10 +191,12 @@ const ticketColumns = [
   { key: "status", label: "Status", type: "status" },
   { key: "createdAt", label: "Date" },
   {
-    key: "updateStatus",
+    key: "start",
     label: "Action",
     type: "action",
-    actionLabel: "Edit",
+    showIf: (ticket) =>
+      ticket.status === "Open" || ticket.status === "In Progress",
+    labelFn: (ticket) => (ticket.status === "Open" ? "Start" : "Continue"),
   },
 ];
 
@@ -216,6 +219,21 @@ async function fetchData() {
 }
 
 onMounted(fetchData);
+
+async function startWorking(ticket) {
+  if (ticket.status !== "Open") return;
+  try {
+    await api.put(`/tickets/${ticket.id}/status`, {
+      statusName: "In Progress",
+    });
+    await fetchData();
+  } catch (e) {
+    console.error(
+      "Failed to start ticket:",
+      e.response?.data?.message ?? e.message
+    );
+  }
+}
 
 const processedTickets = computed(() =>
   (data.value?.myTickets ?? []).map((t) => ({

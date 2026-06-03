@@ -19,3 +19,12 @@ A modern web-based IT Help Desk and Ticketing Management System built as part of
 | IT Support Agent | Manages and resolves tickets |
 | Employee | Creates and tracks their own tickets |
 | Manager | Monitors team tickets and reports |
+
+## Ticket Workflow
+
+1. Employee creates a ticket — it goes to their department manager, unassigned
+2. Manager reviews unassigned tickets and assigns one to an available agent
+3. Agent sees the ticket as Open and clicks **Start** to begin working (status → In Progress)
+4. Agent updates the status as work progresses: Pending, Resolved, or Closed
+5. Employee gets notified when their ticket is Resolved or Closed
+6. No manager approval is needed to close a ticket — the agent closes it directly

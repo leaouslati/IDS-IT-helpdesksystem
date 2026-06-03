@@ -54,6 +54,18 @@ const routes = [
     meta: { requiresAuth: true, roles: ["Employee"] },
   },
   {
+    path: "/forgot-password",
+    name: "ForgotPassword",
+    component: () => import("../views/ForgotPasswordView.vue"),
+    meta: { requiresGuest: true },
+  },
+  {
+    path: "/reset-password",
+    name: "ResetPassword",
+    component: () => import("../views/ResetPasswordView.vue"),
+    meta: { requiresGuest: true },
+  },
+  {
     path: "/unauthorized",
     name: "Unauthorized",
     component: () => import("../views/UnauthorizedView.vue"),

@@ -1,5 +1,6 @@
-using backend.Data;
-using backend.Services;
+using backend.Application.Interfaces;
+using backend.Application.Services;
+using backend.Infrastructure.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -16,9 +17,9 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Register services
-builder.Services.AddScoped<AuthService>();
-builder.Services.AddScoped<DashboardService>();
+// Register services via interfaces
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
 
 // Add JWT Authentication
 var jwtKey = builder.Configuration["Jwt:Key"]!;
@@ -84,6 +85,29 @@ using (var scope = app.Services.CreateScope())
     db.Database.ExecuteSqlRaw(@"
         IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Tickets') AND name = 'AssignedToUserId')
         ALTER TABLE Tickets ADD AssignedToUserId int NULL");
+
+    // Add FailedLoginAttempts column to Users if not present
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Users') AND name = 'FailedLoginAttempts')
+        ALTER TABLE Users ADD FailedLoginAttempts int NOT NULL DEFAULT 0");
+
+    // Add LockoutUntil column to Users if not present
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Users') AND name = 'LockoutUntil')
+        ALTER TABLE Users ADD LockoutUntil datetime2 NULL");
+
+    // Add PasswordResetTokens table if not present
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'PasswordResetTokens')
+        CREATE TABLE PasswordResetTokens (
+            Id int NOT NULL IDENTITY PRIMARY KEY,
+            UserId int NOT NULL,
+            Token nvarchar(100) NOT NULL,
+            ExpiresAt datetime2 NOT NULL,
+            IsUsed bit NOT NULL DEFAULT 0,
+            CreatedAt datetime2 NOT NULL,
+            CONSTRAINT FK_PasswordResetTokens_Users_UserId FOREIGN KEY (UserId) REFERENCES Users(Id)
+        )");
 
     await DbSeeder.SeedAsync(db);
 }

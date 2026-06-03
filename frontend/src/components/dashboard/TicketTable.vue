@@ -49,13 +49,19 @@
               >
                 {{ ticket[col.key] }}
               </span>
-              <button
-                v-else-if="col.type === 'action'"
-                @click="emit('action-click', ticket)"
-                class="px-3 py-1 rounded-lg text-xs font-medium text-[#14B8A6] border border-[#14B8A6]/40 hover:bg-[#14B8A6]/10 transition-colors duration-150"
-              >
-                {{ col.actionLabel || "View" }}
-              </button>
+              <template v-else-if="col.type === 'action'">
+                <button
+                  v-if="!col.showIf || col.showIf(ticket)"
+                  @click="emit('action-click', ticket)"
+                  class="text-xs font-semibold text-[#14B8A6] hover:text-teal-600 transition-colors duration-150"
+                >
+                  {{
+                    col.labelFn
+                      ? col.labelFn(ticket)
+                      : col.actionLabel || "View"
+                  }}
+                </button>
+              </template>
               <span
                 v-else
                 class="text-[#0F172A] dark:text-gray-300 text-[13px]"
