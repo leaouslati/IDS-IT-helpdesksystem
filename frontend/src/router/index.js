@@ -1,26 +1,111 @@
 import { createRouter, createWebHistory } from "vue-router";
-import HomeView from "../views/HomeView.vue";
+import { useAuthStore } from "../store/auth";
+
+export function getRoleDashboard(role) {
+  const map = {
+    Admin: "/dashboard/admin",
+    Manager: "/dashboard/manager",
+    Agent: "/dashboard/agent",
+    Employee: "/dashboard/employee",
+  };
+  return map[role] || "/dashboard/admin";
+}
 
 const routes = [
   {
     path: "/",
-    name: "home",
-    component: HomeView,
+    redirect: "/login",
   },
   {
-    path: "/about",
-    name: "about",
-    // route level code-splitting
-    // this generates a separate chunk (about.[hash].js) for this route
-    // which is lazy-loaded when the route is visited.
-    component: () =>
-      import(/* webpackChunkName: "about" */ "../views/AboutView.vue"),
+    path: "/login",
+    name: "Login",
+    component: () => import("../views/LoginView.vue"),
+    meta: { requiresGuest: true },
+  },
+  {
+    path: "/dashboard",
+    redirect: () => {
+      const authStore = useAuthStore();
+      return getRoleDashboard(authStore.userRole);
+    },
+  },
+  {
+    path: "/dashboard/admin",
+    name: "AdminDashboard",
+    component: () => import("../views/dashboards/AdminDashboard.vue"),
+    meta: { requiresAuth: true, roles: ["Admin"] },
+  },
+  {
+    path: "/dashboard/manager",
+    name: "ManagerDashboard",
+    component: () => import("../views/dashboards/ManagerDashboard.vue"),
+    meta: { requiresAuth: true, roles: ["Manager"] },
+  },
+  {
+    path: "/dashboard/agent",
+    name: "AgentDashboard",
+    component: () => import("../views/dashboards/AgentDashboard.vue"),
+    meta: { requiresAuth: true, roles: ["Agent"] },
+  },
+  {
+    path: "/dashboard/employee",
+    name: "EmployeeDashboard",
+    component: () => import("../views/dashboards/EmployeeDashboard.vue"),
+    meta: { requiresAuth: true, roles: ["Employee"] },
+  },
+  {
+    path: "/forgot-password",
+    name: "ForgotPassword",
+    component: () => import("../views/ForgotPasswordView.vue"),
+    meta: { requiresGuest: true },
+  },
+  {
+    path: "/reset-password",
+    name: "ResetPassword",
+    component: () => import("../views/ResetPasswordView.vue"),
+    meta: { requiresGuest: true },
+  },
+  {
+    path: "/unauthorized",
+    name: "Unauthorized",
+    component: () => import("../views/UnauthorizedView.vue"),
+  },
+  {
+    path: "/:pathMatch(.*)*",
+    name: "NotFound",
+    component: () => import("../views/NotFoundView.vue"),
   },
 ];
 
 const router = createRouter({
-  history: createWebHistory(process.env.BASE_URL),
+  history: createWebHistory(),
   routes,
+});
+
+router.beforeEach((to, _from, next) => {
+  const authStore = useAuthStore();
+
+  if (to.meta.requiresAuth && !authStore.isLoggedIn) {
+    next("/login");
+    return;
+  }
+
+  if (to.meta.requiresGuest && authStore.isLoggedIn) {
+    next(getRoleDashboard(authStore.userRole));
+    return;
+  }
+
+  // Role-based access check
+  if (
+    to.meta.roles &&
+    authStore.userRole &&
+    !to.meta.roles.includes(authStore.userRole)
+  ) {
+    next(getRoleDashboard(authStore.userRole));
+    return;
+  }
+
+  next();
 });
 
 export default router;

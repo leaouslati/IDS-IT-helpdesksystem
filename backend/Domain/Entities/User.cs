@@ -1,4 +1,4 @@
-﻿namespace backend.Models
+namespace backend.Domain.Entities
 {
     public class User
     {
@@ -11,5 +11,9 @@
         public Role Role { get; set; } = null!;
         public bool IsActive { get; set; } = true;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public int? DepartmentId { get; set; }
+        public Department? Department { get; set; }
+        public int FailedLoginAttempts { get; set; } = 0;
+        public DateTime? LockoutUntil { get; set; }
     }
 }

@@ -1,6 +1,6 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations.Schema;
 
-namespace backend.Models
+namespace backend.Domain.Entities
 {
     public class TicketComment
     {

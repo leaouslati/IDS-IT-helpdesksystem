@@ -1,6 +1,6 @@
-﻿namespace backend.Models
+namespace backend.Domain.Entities
 {
-    public class Priority
+    public class Category
     {
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;

@@ -1,4 +1,4 @@
-﻿namespace backend.Models
+namespace backend.Domain.Entities
 {
     public class Ticket
     {
@@ -16,6 +16,8 @@
         public User CreatedByUser { get; set; } = null!;
         public int? AssignedToUserId { get; set; }
         public User? AssignedToUser { get; set; }
+        public int? DepartmentId { get; set; }
+        public Department? Department { get; set; }
         public bool IsEscalated { get; set; } = false;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }

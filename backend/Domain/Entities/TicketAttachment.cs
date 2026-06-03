@@ -1,4 +1,4 @@
-﻿namespace backend.Models
+namespace backend.Domain.Entities
 {
     public class TicketAttachment
     {
