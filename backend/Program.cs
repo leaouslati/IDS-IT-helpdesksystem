@@ -20,6 +20,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Register services via interfaces
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<ITicketService, TicketService>();
+builder.Services.AddScoped<ILookupService, LookupService>();
 
 // Add JWT Authentication
 var jwtKey = builder.Configuration["Jwt:Key"]!;
@@ -109,8 +111,45 @@ using (var scope = app.Services.CreateScope())
             CONSTRAINT FK_PasswordResetTokens_Users_UserId FOREIGN KEY (UserId) REFERENCES Users(Id)
         )");
 
+    // Add escalation tracking columns to Tickets if not present (Part 1 additions)
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Tickets') AND name = 'EscalatedByUserId')
+        ALTER TABLE Tickets ADD EscalatedByUserId int NULL");
+
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Tickets') AND name = 'EscalatedAt')
+        ALTER TABLE Tickets ADD EscalatedAt datetime2 NULL");
+
+    // Add escalation comment flag to TicketComments if not present (Part 1 additions)
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('TicketComments') AND name = 'IsEscalationComment')
+        ALTER TABLE TicketComments ADD IsEscalationComment bit NOT NULL DEFAULT 0");
+
+    // Add attachment metadata columns to TicketAttachments if not present (Part 3 additions)
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('TicketAttachments') AND name = 'FileSize')
+        ALTER TABLE TicketAttachments ADD FileSize bigint NOT NULL DEFAULT 0");
+
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('TicketAttachments') AND name = 'FileType')
+        ALTER TABLE TicketAttachments ADD FileType nvarchar(100) NOT NULL DEFAULT ''");
+
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('TicketAttachments') AND name = 'UploadedByUserId')
+        ALTER TABLE TicketAttachments ADD UploadedByUserId int NOT NULL DEFAULT 0");
+
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('TicketAttachments') AND name = 'CommentId')
+        ALTER TABLE TicketAttachments ADD CommentId int NULL");
+
     await DbSeeder.SeedAsync(db);
 }
+
+// Ensure the file upload directory exists before serving requests
+var uploadsDir = Path.Combine(
+    app.Environment.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"),
+    "uploads", "attachments");
+Directory.CreateDirectory(uploadsDir);
 
 if (app.Environment.IsDevelopment())
 {
@@ -119,6 +158,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();
 app.UseCors("AllowVue");
 app.UseAuthentication();
 app.UseAuthorization();

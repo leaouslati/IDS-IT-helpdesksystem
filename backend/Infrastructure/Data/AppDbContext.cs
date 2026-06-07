@@ -45,6 +45,24 @@ namespace backend.Infrastructure.Data
                 .WithMany()
                 .HasForeignKey(t => t.DepartmentId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Ticket>()
+                .HasOne(t => t.EscalatedByUser)
+                .WithMany()
+                .HasForeignKey(t => t.EscalatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TicketAttachment>()
+                .HasOne(a => a.UploadedByUser)
+                .WithMany()
+                .HasForeignKey(a => a.UploadedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TicketAttachment>()
+                .HasOne(a => a.Comment)
+                .WithMany()
+                .HasForeignKey(a => a.CommentId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

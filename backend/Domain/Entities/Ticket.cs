@@ -19,6 +19,9 @@ namespace backend.Domain.Entities
         public int? DepartmentId { get; set; }
         public Department? Department { get; set; }
         public bool IsEscalated { get; set; } = false;
+        public int? EscalatedByUserId { get; set; }
+        public User? EscalatedByUser { get; set; }
+        public DateTime? EscalatedAt { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }
         public ICollection<TicketComment> Comments { get; set; } = new List<TicketComment>();
