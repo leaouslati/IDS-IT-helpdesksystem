@@ -4,7 +4,7 @@ namespace backend.Application.DTOs
     {
         public int AssignedToMe { get; set; }
         public int ResolvedToday { get; set; }
-        public int PendingResponse { get; set; }
+        public int InProgress { get; set; }
         public int ResolvedThisWeek { get; set; }
         public int EscalatedCount { get; set; }
         public List<RecentTicketDto> MyTickets { get; set; } = new();

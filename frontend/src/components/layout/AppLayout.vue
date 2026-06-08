@@ -59,6 +59,7 @@
       <div class="px-3 pb-4 pt-2 border-t border-white/[0.08] space-y-1.5">
         <button
           v-if="showCreateTicket"
+          @click="router.push('/tickets/create')"
           class="w-full flex items-center justify-center gap-2 bg-[#14B8A6] hover:bg-teal-500 active:bg-teal-600 text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors duration-200 shadow-sm"
         >
           <PlusCircle :size="15" />
@@ -181,12 +182,15 @@ defineProps({
   navLinks: { type: Array, default: () => [] },
   pageTitle: { type: String, default: "Dashboard" },
   notificationCount: { type: Number, default: 0 },
-  showCreateTicket: { type: Boolean, default: true },
 });
 
 const router = useRouter();
 const route = useRoute();
 const authStore = useAuthStore();
+
+const showCreateTicket = computed(() =>
+  ["Employee", "Manager"].includes(authStore.userRole)
+);
 
 const sidebarOpen = ref(false);
 const isDark = ref(false);
@@ -210,7 +214,10 @@ function toggleDark() {
 }
 
 function isActive(path) {
-  return route.path === path;
+  if (route.path === path) return true;
+  // match /tickets and all sub-routes (/tickets/create, /tickets/:id)
+  if (path === "/tickets" && route.path.startsWith("/tickets")) return true;
+  return false;
 }
 
 const userInitials = computed(() => {

@@ -47,6 +47,7 @@ namespace backend.Application.DTOs
         public string CreatedBy { get; set; } = string.Empty;
         public string? AssignedTo { get; set; }
         public bool IsEscalated { get; set; }
+        public int CommentCount { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
     }
@@ -76,8 +77,22 @@ namespace backend.Application.DTOs
         public DateTime? UpdatedAt { get; set; }
         public bool CanEdit { get; set; }
         public bool CanDelete { get; set; }
+        public bool CanAssign { get; set; }
+        public bool CanUpdateStatus { get; set; }
+        public bool CanEscalate { get; set; }
+        public string? EscalationReason { get; set; }
         public List<TicketCommentDto> Comments { get; set; } = new();
         public List<TicketAttachmentDto> Attachments { get; set; } = new();
+        public List<TicketActivityLogDto> ActivityLog { get; set; } = new();
+    }
+
+    public class TicketActivityLogDto
+    {
+        public string Action { get; set; } = string.Empty;
+        public string? FromValue { get; set; }
+        public string? ToValue { get; set; }
+        public string UserName { get; set; } = string.Empty;
+        public DateTime LoggedAt { get; set; }
     }
 
     public class TicketCommentDto

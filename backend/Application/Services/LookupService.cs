@@ -28,6 +28,7 @@ namespace backend.Application.Services
 
         public async Task<IEnumerable<TicketStatusDto>> GetStatusesAsync() =>
             await _context.TicketStatuses
+                .Where(s => s.Name != "Pending")
                 .OrderBy(s => s.Id)
                 .Select(s => new TicketStatusDto { Id = s.Id, Name = s.Name })
                 .ToListAsync();

@@ -424,6 +424,16 @@ namespace backend.Infrastructure.Data
                 }
                 await context.SaveChangesAsync();
             }
+
+            // Clear IsEscalated on unassigned tickets (escalation requires assignment)
+            var wronglyEscalated = await context.Tickets
+                .Where(t => t.IsEscalated && t.AssignedToUserId == null)
+                .ToListAsync();
+            if (wronglyEscalated.Count > 0)
+            {
+                foreach (var t in wronglyEscalated) t.IsEscalated = false;
+                await context.SaveChangesAsync();
+            }
             if (!await context.Tickets.AnyAsync(t => t.ReferenceNumber == "TKT-021"))
             {
                 var emp1It   = await context.Users.FirstAsync(u => u.Email == "employee@helpdesk.com");
@@ -521,7 +531,7 @@ namespace backend.Infrastructure.Data
                 await context.SaveChangesAsync();
             }
 
-            // Seed Activity Logs
+            // Seed Activity Logs (global, no ticket link)
             if (!await context.ActivityLogs.AnyAsync())
             {
                 var admin   = await context.Users.FirstAsync(u => u.Email == "admin@helpdesk.com");
@@ -533,18 +543,94 @@ namespace backend.Infrastructure.Data
                 var manager = await context.Users.FirstAsync(u => u.Email == "manager@helpdesk.com");
 
                 context.ActivityLogs.AddRange(
-                    new ActivityLog { UserId = emp1.Id,    Action = "Ticket Created",        Details = "Ticket TKT-001 created: Laptop not turning on",       LoggedAt = DateTime.UtcNow.AddDays(-28) },
-                    new ActivityLog { UserId = manager.Id, Action = "Ticket Assigned",       Details = "Ticket TKT-017 assigned to Sara Williams",             LoggedAt = DateTime.UtcNow.AddDays(-3)  },
-                    new ActivityLog { UserId = agent2.Id,  Action = "Ticket Status Updated", Details = "Ticket TKT-002 status changed to In Progress",         LoggedAt = DateTime.UtcNow.AddDays(-24) },
-                    new ActivityLog { UserId = agent3.Id,  Action = "Ticket Escalated",      Details = "Ticket TKT-003 escalated due to network impact",        LoggedAt = DateTime.UtcNow.AddDays(-21) },
-                    new ActivityLog { UserId = agent1.Id,  Action = "Ticket Resolved",       Details = "Ticket TKT-004 marked as resolved",                    LoggedAt = DateTime.UtcNow.AddDays(-18) },
-                    new ActivityLog { UserId = agent1.Id,  Action = "Comment Added",         Details = "Comment added to TKT-005 by Agent User",               LoggedAt = DateTime.UtcNow.AddDays(-17) },
-                    new ActivityLog { UserId = admin.Id,   Action = "User Logged In",        Details = "Admin User logged in successfully",                     LoggedAt = DateTime.UtcNow.AddDays(-10) },
-                    new ActivityLog { UserId = manager.Id, Action = "User Logged In",        Details = "Manager User logged in successfully",                   LoggedAt = DateTime.UtcNow.AddDays(-5)  },
-                    new ActivityLog { UserId = emp2.Id,    Action = "Ticket Created",        Details = "Ticket TKT-018 created: Teams not connecting",          LoggedAt = DateTime.UtcNow.AddDays(-3)  },
-                    new ActivityLog { UserId = agent1.Id,  Action = "Ticket Escalated",      Details = "Ticket TKT-020 escalated: Backup failure alert",        LoggedAt = DateTime.UtcNow.AddDays(-1)  }
+                    new ActivityLog { UserId = emp1.Id,    Action = "Ticket Created",        Details = "Ticket TKT-001 created: Laptop not turning on",  LoggedAt = DateTime.UtcNow.AddDays(-28) },
+                    new ActivityLog { UserId = manager.Id, Action = "Ticket Assigned",       Details = "Ticket TKT-017 assigned to Sara Williams",        LoggedAt = DateTime.UtcNow.AddDays(-3)  },
+                    new ActivityLog { UserId = agent2.Id,  Action = "Ticket Status Updated", Details = "Ticket TKT-002 status changed to In Progress",    LoggedAt = DateTime.UtcNow.AddDays(-24) },
+                    new ActivityLog { UserId = agent3.Id,  Action = "Ticket Escalated",      Details = "Ticket TKT-003 escalated due to network impact",  LoggedAt = DateTime.UtcNow.AddDays(-21) },
+                    new ActivityLog { UserId = agent1.Id,  Action = "Ticket Resolved",       Details = "Ticket TKT-004 marked as resolved",               LoggedAt = DateTime.UtcNow.AddDays(-18) },
+                    new ActivityLog { UserId = agent1.Id,  Action = "Comment Added",         Details = "Comment added to TKT-005 by Agent User",          LoggedAt = DateTime.UtcNow.AddDays(-17) },
+                    new ActivityLog { UserId = admin.Id,   Action = "User Logged In",        Details = "Admin User logged in successfully",                LoggedAt = DateTime.UtcNow.AddDays(-10) },
+                    new ActivityLog { UserId = manager.Id, Action = "User Logged In",        Details = "Manager User logged in successfully",              LoggedAt = DateTime.UtcNow.AddDays(-5)  },
+                    new ActivityLog { UserId = emp2.Id,    Action = "Ticket Created",        Details = "Ticket TKT-018 created: Teams not connecting",     LoggedAt = DateTime.UtcNow.AddDays(-3)  },
+                    new ActivityLog { UserId = agent1.Id,  Action = "Ticket Escalated",      Details = "Ticket TKT-020 escalated: Backup failure alert",   LoggedAt = DateTime.UtcNow.AddDays(-1)  }
                 );
                 await context.SaveChangesAsync();
+            }
+
+            // Seed per-ticket activity logs (linked via TicketId for the Activity History panel)
+            if (!await context.ActivityLogs.AnyAsync(a => a.TicketId != null))
+            {
+                var agent1  = await context.Users.FirstAsync(u => u.Email == "agent@helpdesk.com");
+                var agent2  = await context.Users.FirstAsync(u => u.Email == "mike@helpdesk.com");
+                var agent3  = await context.Users.FirstAsync(u => u.Email == "sara@helpdesk.com");
+                var agent4  = await context.Users.FirstAsync(u => u.Email == "john@helpdesk.com");
+                var emp2    = await context.Users.FirstAsync(u => u.Email == "alice@helpdesk.com");
+                var emp3    = await context.Users.FirstAsync(u => u.Email == "bob@helpdesk.com");
+                var emp4    = await context.Users.FirstAsync(u => u.Email == "carol@helpdesk.com");
+                var manager = await context.Users.FirstAsync(u => u.Email == "manager@helpdesk.com");
+
+                var t2  = await context.Tickets.FirstOrDefaultAsync(t => t.ReferenceNumber == "TKT-002");
+                var t3  = await context.Tickets.FirstOrDefaultAsync(t => t.ReferenceNumber == "TKT-003");
+                var t4  = await context.Tickets.FirstOrDefaultAsync(t => t.ReferenceNumber == "TKT-004");
+                var t7  = await context.Tickets.FirstOrDefaultAsync(t => t.ReferenceNumber == "TKT-007");
+                var t10 = await context.Tickets.FirstOrDefaultAsync(t => t.ReferenceNumber == "TKT-010");
+                var t11 = await context.Tickets.FirstOrDefaultAsync(t => t.ReferenceNumber == "TKT-011");
+                var t14 = await context.Tickets.FirstOrDefaultAsync(t => t.ReferenceNumber == "TKT-014");
+                var t15 = await context.Tickets.FirstOrDefaultAsync(t => t.ReferenceNumber == "TKT-015");
+                var t17 = await context.Tickets.FirstOrDefaultAsync(t => t.ReferenceNumber == "TKT-017");
+                var t21 = await context.Tickets.FirstOrDefaultAsync(t => t.ReferenceNumber == "TKT-021");
+
+                var logs = new List<ActivityLog>();
+
+                if (t2 != null) logs.AddRange(new[]
+                {
+                    new ActivityLog { UserId = emp2.Id,    TicketId = t2.Id, Action = "Ticket Created",        LoggedAt = DateTime.UtcNow.AddDays(-25) },
+                    new ActivityLog { UserId = manager.Id, TicketId = t2.Id, Action = "Ticket Assigned",       ToValue = "Mike Johnson",    LoggedAt = DateTime.UtcNow.AddDays(-25) },
+                    new ActivityLog { UserId = agent2.Id,  TicketId = t2.Id, Action = "Ticket Status Updated", FromValue = "Open", ToValue = "In Progress", LoggedAt = DateTime.UtcNow.AddDays(-24) },
+                    new ActivityLog { UserId = agent2.Id,  TicketId = t2.Id, Action = "Comment Added",         LoggedAt = DateTime.UtcNow.AddDays(-24) },
+                });
+
+                if (t3 != null) logs.AddRange(new[]
+                {
+                    new ActivityLog { UserId = emp3.Id,    TicketId = t3.Id, Action = "Ticket Created",        LoggedAt = DateTime.UtcNow.AddDays(-22) },
+                    new ActivityLog { UserId = manager.Id, TicketId = t3.Id, Action = "Ticket Assigned",       ToValue = "Sara Williams",   LoggedAt = DateTime.UtcNow.AddDays(-22) },
+                    new ActivityLog { UserId = agent3.Id,  TicketId = t3.Id, Action = "Ticket Status Updated", FromValue = "Open", ToValue = "In Progress", LoggedAt = DateTime.UtcNow.AddDays(-21) },
+                    new ActivityLog { UserId = agent3.Id,  TicketId = t3.Id, Action = "Comment Added",         LoggedAt = DateTime.UtcNow.AddDays(-21) },
+                    new ActivityLog { UserId = agent3.Id,  TicketId = t3.Id, Action = "Ticket Escalated",      LoggedAt = DateTime.UtcNow.AddDays(-21) },
+                    new ActivityLog { UserId = agent3.Id,  TicketId = t3.Id, Action = "Comment Added",         LoggedAt = DateTime.UtcNow.AddDays(-20) },
+                });
+
+                if (t4 != null) logs.AddRange(new[]
+                {
+                    new ActivityLog { UserId = emp4.Id,    TicketId = t4.Id, Action = "Ticket Created",        LoggedAt = DateTime.UtcNow.AddDays(-20) },
+                    new ActivityLog { UserId = manager.Id, TicketId = t4.Id, Action = "Ticket Assigned",       ToValue = "John Smith",      LoggedAt = DateTime.UtcNow.AddDays(-20) },
+                    new ActivityLog { UserId = agent4.Id,  TicketId = t4.Id, Action = "Ticket Status Updated", FromValue = "Open", ToValue = "In Progress", LoggedAt = DateTime.UtcNow.AddDays(-19) },
+                    new ActivityLog { UserId = agent4.Id,  TicketId = t4.Id, Action = "Ticket Status Updated", FromValue = "In Progress", ToValue = "Resolved", LoggedAt = DateTime.UtcNow.AddDays(-18) },
+                });
+
+                if (t11 != null) logs.AddRange(new[]
+                {
+                    new ActivityLog { UserId = emp3.Id,    TicketId = t11.Id, Action = "Ticket Created",        LoggedAt = DateTime.UtcNow.AddDays(-10) },
+                    new ActivityLog { UserId = manager.Id, TicketId = t11.Id, Action = "Ticket Assigned",       ToValue = "Mike Johnson",    LoggedAt = DateTime.UtcNow.AddDays(-10) },
+                    new ActivityLog { UserId = agent2.Id,  TicketId = t11.Id, Action = "Ticket Status Updated", FromValue = "Open", ToValue = "In Progress", LoggedAt = DateTime.UtcNow.AddDays(-9) },
+                    new ActivityLog { UserId = agent2.Id,  TicketId = t11.Id, Action = "Comment Added",         LoggedAt = DateTime.UtcNow.AddDays(-9) },
+                    new ActivityLog { UserId = agent2.Id,  TicketId = t11.Id, Action = "Ticket Status Updated", FromValue = "In Progress", ToValue = "Pending", LoggedAt = DateTime.UtcNow.AddDays(-9) },
+                    new ActivityLog { UserId = agent2.Id,  TicketId = t11.Id, Action = "Comment Added",         LoggedAt = DateTime.UtcNow.AddDays(-8) },
+                });
+
+                if (t21 != null) logs.AddRange(new[]
+                {
+                    new ActivityLog { UserId = agent1.Id,  TicketId = t21.Id, Action = "Ticket Created",        LoggedAt = DateTime.UtcNow.AddDays(-9) },
+                    new ActivityLog { UserId = manager.Id, TicketId = t21.Id, Action = "Ticket Assigned",       ToValue = "Agent User",      LoggedAt = DateTime.UtcNow.AddDays(-9) },
+                    new ActivityLog { UserId = agent1.Id,  TicketId = t21.Id, Action = "Ticket Status Updated", FromValue = "Open", ToValue = "In Progress", LoggedAt = DateTime.UtcNow.AddDays(-7) },
+                    new ActivityLog { UserId = agent1.Id,  TicketId = t21.Id, Action = "Ticket Status Updated", FromValue = "In Progress", ToValue = "Resolved", LoggedAt = DateTime.UtcNow.AddDays(-3) },
+                });
+
+                if (logs.Count > 0)
+                {
+                    context.ActivityLogs.AddRange(logs);
+                    await context.SaveChangesAsync();
+                }
             }
         }
     }

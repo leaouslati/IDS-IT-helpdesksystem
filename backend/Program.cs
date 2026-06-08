@@ -142,6 +142,19 @@ using (var scope = app.Services.CreateScope())
         IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('TicketAttachments') AND name = 'CommentId')
         ALTER TABLE TicketAttachments ADD CommentId int NULL");
 
+    // Add TicketId, FromValue, ToValue to ActivityLogs for per-ticket activity history
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('ActivityLogs') AND name = 'TicketId')
+        ALTER TABLE ActivityLogs ADD TicketId int NULL");
+
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('ActivityLogs') AND name = 'FromValue')
+        ALTER TABLE ActivityLogs ADD FromValue nvarchar(200) NULL");
+
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('ActivityLogs') AND name = 'ToValue')
+        ALTER TABLE ActivityLogs ADD ToValue nvarchar(200) NULL");
+
     await DbSeeder.SeedAsync(db);
 }
 

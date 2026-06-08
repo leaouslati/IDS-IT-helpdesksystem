@@ -206,6 +206,8 @@
         title="Recent Tickets"
         :tickets="processedTickets"
         :columns="ticketColumns"
+        @row-click="(t) => router.push(`/tickets/${t.id}`)"
+        @action-click="(t) => router.push(`/tickets/${t.id}`)"
       />
     </template>
   </AppLayout>
@@ -213,6 +215,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from "vue";
+import { useRouter } from "vue-router";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -252,6 +255,8 @@ import StatCard from "../../components/dashboard/StatCard.vue";
 import TicketTable from "../../components/dashboard/TicketTable.vue";
 import api from "../../api/axios";
 
+const router = useRouter();
+
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -282,6 +287,7 @@ const ticketColumns = [
   { key: "status", label: "Status", type: "status" },
   { key: "assignedTo", label: "Assigned To" },
   { key: "createdAt", label: "Date" },
+  { key: "view", label: "", type: "action", actionLabel: "View" },
 ];
 
 const loading = ref(true);

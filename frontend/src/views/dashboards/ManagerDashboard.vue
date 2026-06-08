@@ -49,12 +49,29 @@
             {{ departmentLabel }}
           </p>
         </div>
-        <button
-          class="flex-shrink-0 px-4 py-2 rounded-lg bg-[#0F172A] dark:bg-white/10 text-white text-sm font-semibold hover:bg-gray-800 dark:hover:bg-white/20 transition-colors flex items-center gap-2"
-        >
-          <Download :size="14" />
-          Export Report
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            @click="router.push('/tickets/create')"
+            class="flex-shrink-0 px-4 py-2 rounded-lg bg-[#14B8A6] text-white text-sm font-semibold hover:bg-teal-600 transition-colors flex items-center gap-2"
+          >
+            <Plus :size="14" />
+            New Ticket
+          </button>
+          <button
+            @click="router.push('/tickets')"
+            class="flex-shrink-0 px-4 py-2 rounded-lg border border-gray-200 dark:border-white/10 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
+          >
+            <FileText :size="14" />
+            All Tickets
+          </button>
+          <button
+            @click="toastStore.show('Report export coming soon', 'info')"
+            class="flex-shrink-0 px-4 py-2 rounded-lg bg-[#0F172A] dark:bg-white/10 text-white text-sm font-semibold hover:bg-gray-800 dark:hover:bg-white/20 transition-colors flex items-center gap-2"
+          >
+            <Download :size="14" />
+            Export Report
+          </button>
+        </div>
       </div>
 
       <!-- Stat cards -->
@@ -101,15 +118,23 @@
               Unassigned Tickets
             </h3>
             <p class="text-xs text-gray-400 mt-0.5">
-              Assign these to an available agent
+              Click a ticket or "Assign" to open and assign an agent
             </p>
           </div>
-          <span
-            v-if="(data?.unassignedTicketsList?.length ?? 0) > 0"
-            class="text-xs font-semibold text-amber-600 dark:text-amber-400"
-          >
-            {{ data.unassignedTicketsList.length }} pending
-          </span>
+          <div class="flex items-center gap-3">
+            <span
+              v-if="(data?.unassignedTicketsList?.length ?? 0) > 0"
+              class="text-xs font-semibold text-amber-600 dark:text-amber-400"
+            >
+              {{ data.unassignedTicketsList.length }} pending
+            </span>
+            <button
+              @click="router.push('/tickets?filter=unassigned')"
+              class="text-xs font-semibold text-[#14B8A6] hover:text-teal-600 transition-colors"
+            >
+              View all →
+            </button>
+          </div>
         </div>
 
         <div class="overflow-x-auto">
@@ -129,7 +154,8 @@
               <tr
                 v-for="ticket in data?.unassignedTicketsList ?? []"
                 :key="ticket.id"
-                class="hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors duration-150"
+                class="hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors duration-150 cursor-pointer"
+                @click="router.push(`/tickets/${ticket.id}`)"
               >
                 <td
                   class="px-5 py-3.5 whitespace-nowrap text-[13px] text-[#0F172A] dark:text-gray-300"
@@ -158,6 +184,7 @@
                 </td>
                 <td class="px-5 py-3.5 whitespace-nowrap">
                   <button
+                    @click.stop="router.push(`/tickets/${ticket.id}`)"
                     class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#14B8A6] text-white hover:bg-teal-600 active:bg-teal-700 transition-colors"
                   >
                     Assign
@@ -279,6 +306,8 @@
         title="Department Recent Tickets"
         :tickets="processedTickets"
         :columns="ticketColumns"
+        @row-click="(t) => router.push(`/tickets/${t.id}`)"
+        @action-click="(t) => router.push(`/tickets/${t.id}`)"
       />
     </template>
   </AppLayout>
@@ -286,6 +315,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from "vue";
+import { useRouter } from "vue-router";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -308,11 +338,16 @@ import {
   TrendingUp,
   AlertCircle,
   Download,
+  Plus,
 } from "lucide-vue-next";
 import AppLayout from "../../components/layout/AppLayout.vue";
 import StatCard from "../../components/dashboard/StatCard.vue";
 import TicketTable from "../../components/dashboard/TicketTable.vue";
+import { useToastStore } from "../../store/toast";
 import api from "../../api/axios";
+
+const router = useRouter();
+const toastStore = useToastStore();
 
 ChartJS.register(
   CategoryScale,
@@ -338,6 +373,7 @@ const ticketColumns = [
   { key: "status", label: "Status", type: "status" },
   { key: "assignedTo", label: "Agent" },
   { key: "createdAt", label: "Date" },
+  { key: "view", label: "", type: "action", actionLabel: "View" },
 ];
 
 const unassignedColumns = [

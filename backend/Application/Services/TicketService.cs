@@ -72,9 +72,10 @@ namespace backend.Application.Services
                     AssignedTo = t.AssignedToUser != null
                         ? t.AssignedToUser.FirstName + " " + t.AssignedToUser.LastName
                         : null,
-                    IsEscalated = t.IsEscalated,
-                    CreatedAt = t.CreatedAt,
-                    UpdatedAt = t.UpdatedAt
+                    IsEscalated  = t.IsEscalated,
+                    CommentCount = t.Comments.Count(),
+                    CreatedAt    = t.CreatedAt,
+                    UpdatedAt    = t.UpdatedAt
                 })
                 .ToListAsync();
         }
@@ -95,6 +96,12 @@ namespace backend.Application.Services
                 .Include(t => t.Attachments).ThenInclude(a => a.UploadedByUser)
                 .FirstOrDefaultAsync(t => t.Id == ticketId);
 
+            var activityLog = await _context.ActivityLogs
+                .Include(a => a.User)
+                .Where(a => a.TicketId == ticketId)
+                .OrderBy(a => a.LoggedAt)
+                .ToListAsync();
+
             if (ticket == null) return null;
 
             // Role-based access: return null (→ 404) to avoid leaking existence
@@ -109,12 +116,24 @@ namespace backend.Application.Services
                 if (deptId != ticket.DepartmentId) return null;
             }
 
-            bool isOpen    = ticket.TicketStatus.Name == "Open";
-            bool canEdit   = isOpen && role == "Employee" && ticket.CreatedByUserId == userId;
-            bool canDelete = isOpen && (
+            bool isOpen          = ticket.TicketStatus.Name == "Open";
+            bool isActive        = ticket.TicketStatus.Name is not ("Resolved" or "Closed");
+            bool canEdit         = isOpen && role == "Employee" && ticket.CreatedByUserId == userId;
+            bool canDelete       = isOpen && (
                 (role == "Employee" && ticket.CreatedByUserId == userId) ||
-                 role == "Manager"
+                 role == "Manager" || role == "Admin"
             );
+            bool canAssign       = (role == "Manager" || role == "Admin") && isActive;
+            bool canUpdateStatus = role == "Agent" && ticket.AssignedToUserId == userId && isActive;
+            bool canEscalate     = (role == "Agent" || role == "Manager") && isActive && ticket.AssignedToUserId != null && !ticket.IsEscalated;
+
+            string? escalationReason = ticket.IsEscalated
+                ? ticket.Comments
+                    .Where(c => c.IsEscalationComment)
+                    .OrderBy(c => c.CreatedAt)
+                    .Select(c => c.Content)
+                    .FirstOrDefault()
+                : null;
 
             return new TicketDetailDto
             {
@@ -145,6 +164,10 @@ namespace backend.Application.Services
                 UpdatedAt       = ticket.UpdatedAt,
                 CanEdit         = canEdit,
                 CanDelete       = canDelete,
+                CanAssign       = canAssign,
+                CanUpdateStatus = canUpdateStatus,
+                CanEscalate     = canEscalate,
+                EscalationReason = escalationReason,
                 Comments        = ticket.Comments
                     .OrderBy(c => c.CreatedAt)
                     .Select(c => new TicketCommentDto
@@ -169,6 +192,15 @@ namespace backend.Application.Services
                         UploadedBy       = a.UploadedByUser.FirstName + " " + a.UploadedByUser.LastName,
                         CommentId        = a.CommentId,
                         UploadedAt       = a.UploadedAt
+                    }).ToList(),
+                ActivityLog     = activityLog
+                    .Select(a => new TicketActivityLogDto
+                    {
+                        Action    = a.Action,
+                        FromValue = a.FromValue,
+                        ToValue   = a.ToValue,
+                        UserName  = a.User.FirstName + " " + a.User.LastName,
+                        LoggedAt  = a.LoggedAt
                     }).ToList()
             };
         }
@@ -228,6 +260,7 @@ namespace backend.Application.Services
             _context.ActivityLogs.Add(new ActivityLog
             {
                 UserId   = userId,
+                TicketId = ticket.Id,
                 Action   = "Ticket Created",
                 Details  = $"Ticket {ticket.ReferenceNumber} created: {ticket.Title}",
                 LoggedAt = DateTime.UtcNow
@@ -268,6 +301,7 @@ namespace backend.Application.Services
             _context.ActivityLogs.Add(new ActivityLog
             {
                 UserId   = userId,
+                TicketId = ticketId,
                 Action   = "Ticket Updated",
                 Details  = $"Ticket {ticket.ReferenceNumber} updated",
                 LoggedAt = DateTime.UtcNow
@@ -355,6 +389,13 @@ namespace backend.Application.Services
             if (openCount >= 3)
                 return (false, $"Agent already has {openCount} active ticket(s). Maximum is 3.");
 
+            string? previousAgent = null;
+            if (ticket.AssignedToUserId.HasValue)
+            {
+                var prev = await _context.Users.FindAsync(ticket.AssignedToUserId.Value);
+                if (prev != null) previousAgent = prev.FirstName + " " + prev.LastName;
+            }
+
             ticket.AssignedToUserId = dto.AgentUserId;
             ticket.UpdatedAt        = DateTime.UtcNow;
 
@@ -368,10 +409,13 @@ namespace backend.Application.Services
 
             _context.ActivityLogs.Add(new ActivityLog
             {
-                UserId   = managerId,
-                Action   = "Ticket Assigned",
-                Details  = $"Ticket {ticket.ReferenceNumber} assigned to {agent.FirstName} {agent.LastName}",
-                LoggedAt = DateTime.UtcNow
+                UserId    = managerId,
+                TicketId  = ticketId,
+                Action    = "Ticket Assigned",
+                Details   = $"Ticket {ticket.ReferenceNumber} assigned to {agent.FirstName} {agent.LastName}",
+                FromValue = previousAgent,
+                ToValue   = agent.FirstName + " " + agent.LastName,
+                LoggedAt  = DateTime.UtcNow
             });
 
             await _context.SaveChangesAsync();
@@ -395,9 +439,14 @@ namespace backend.Application.Services
             if (dto.StatusName == "Open")
                 return (false, "Cannot set status back to Open.");
 
+            if (dto.StatusName == "Pending")
+                return (false, "Pending is not a valid status.");
+
             var newStatus = await _context.TicketStatuses
                 .FirstOrDefaultAsync(s => s.Name == dto.StatusName);
             if (newStatus == null) return (false, $"Invalid status '{dto.StatusName}'.");
+
+            var previousStatus = ticket.TicketStatus.Name;
 
             ticket.TicketStatusId = newStatus.Id;
             ticket.UpdatedAt      = DateTime.UtcNow;
@@ -415,10 +464,13 @@ namespace backend.Application.Services
 
             _context.ActivityLogs.Add(new ActivityLog
             {
-                UserId   = agentId,
-                Action   = "Ticket Status Updated",
-                Details  = $"Ticket {ticket.ReferenceNumber} status changed to {dto.StatusName}",
-                LoggedAt = DateTime.UtcNow
+                UserId    = agentId,
+                TicketId  = ticketId,
+                Action    = "Ticket Status Updated",
+                Details   = $"Ticket {ticket.ReferenceNumber} status changed to {dto.StatusName}",
+                FromValue = previousStatus,
+                ToValue   = dto.StatusName,
+                LoggedAt  = DateTime.UtcNow
             });
 
             await _context.SaveChangesAsync();
@@ -440,6 +492,9 @@ namespace backend.Application.Services
 
             if (ticket.TicketStatus.Name is "Resolved" or "Closed")
                 return (false, "Cannot escalate a resolved or closed ticket.");
+
+            if (ticket.AssignedToUserId == null)
+                return (false, "Cannot escalate an unassigned ticket. Assign it to an agent first.");
 
             if (role == "Agent" && ticket.AssignedToUserId != userId)
                 return (false, "This ticket is not assigned to you.");
@@ -493,6 +548,7 @@ namespace backend.Application.Services
             _context.ActivityLogs.Add(new ActivityLog
             {
                 UserId   = userId,
+                TicketId = ticketId,
                 Action   = "Ticket Escalated",
                 Details  = $"Ticket {ticket.ReferenceNumber} escalated by {escalator?.FirstName} {escalator?.LastName}: {dto.Reason}",
                 LoggedAt = DateTime.UtcNow
@@ -559,6 +615,7 @@ namespace backend.Application.Services
             _context.ActivityLogs.Add(new ActivityLog
             {
                 UserId   = userId,
+                TicketId = ticketId,
                 Action   = "Comment Added",
                 Details  = $"Comment added to ticket {ticket.ReferenceNumber}",
                 LoggedAt = DateTime.UtcNow
@@ -689,6 +746,7 @@ namespace backend.Application.Services
             _context.ActivityLogs.Add(new ActivityLog
             {
                 UserId   = userId,
+                TicketId = ticketId,
                 Action   = "Attachment Uploaded",
                 Details  = $"File '{file.FileName}' uploaded to ticket {ticket.ReferenceNumber}",
                 LoggedAt = DateTime.UtcNow

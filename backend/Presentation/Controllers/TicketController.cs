@@ -46,7 +46,7 @@ namespace backend.Presentation.Controllers
 
         // ── POST /api/ticket ──────────────────────────────────────────────────
         [HttpPost]
-        [Authorize(Roles = "Employee")]
+        [Authorize(Roles = "Employee,Manager")]
         public async Task<IActionResult> CreateTicket([FromBody] CreateTicketDto dto)
         {
             var (ticket, error) = await _ticketService.CreateTicketAsync(dto, CurrentUserId);
