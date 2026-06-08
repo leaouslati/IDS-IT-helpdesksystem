@@ -299,9 +299,9 @@ namespace backend.Application.Services
                     && t.TicketStatus.Name == "Resolved"
                     && t.UpdatedAt.HasValue && t.UpdatedAt.Value.Date == today);
 
-            var pendingResponse = await _context.Tickets
+            var inProgress = await _context.Tickets
                 .CountAsync(t => t.AssignedToUserId == agentUserId
-                    && t.TicketStatus.Name == "Pending");
+                    && t.TicketStatus.Name == "In Progress");
 
             var resolvedThisWeek = await _context.Tickets
                 .CountAsync(t => t.AssignedToUserId == agentUserId
@@ -354,7 +354,7 @@ namespace backend.Application.Services
             {
                 AssignedToMe = assignedToMe,
                 ResolvedToday = resolvedToday,
-                PendingResponse = pendingResponse,
+                InProgress = inProgress,
                 ResolvedThisWeek = resolvedThisWeek,
                 EscalatedCount = escalatedCount,
                 MyTickets = myActiveTickets,

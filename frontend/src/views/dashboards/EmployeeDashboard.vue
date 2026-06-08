@@ -47,6 +47,7 @@
           </h1>
         </div>
         <button
+          @click="router.push('/tickets/create')"
           class="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 bg-[#14B8A6] text-white text-sm font-semibold rounded-lg hover:bg-teal-600 active:bg-teal-700 transition-colors shadow-sm"
         >
           <Plus :size="15" />
@@ -90,6 +91,8 @@
             title="My Recent Tickets"
             :tickets="processedTickets"
             :columns="ticketColumns"
+            @row-click="(t) => router.push(`/tickets/${t.id}`)"
+            @action-click="(t) => router.push(`/tickets/${t.id}`)"
           />
         </div>
 
@@ -103,6 +106,7 @@
           <button
             v-for="link in quickLinks"
             :key="link.title"
+            @click="link.onClick()"
             class="w-full flex items-center gap-3 bg-white dark:bg-[#1A1D2E] rounded-xl p-3 shadow-sm border border-gray-100 dark:border-white/[0.05] transition-colors duration-200 text-left group hover:bg-gray-50 dark:hover:bg-white/[0.04]"
           >
             <div
@@ -140,6 +144,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from "vue";
+import { useRouter } from "vue-router";
 import {
   LayoutDashboard,
   FileText,
@@ -160,6 +165,8 @@ import StatCard from "../../components/dashboard/StatCard.vue";
 import TicketTable from "../../components/dashboard/TicketTable.vue";
 import api from "../../api/axios";
 
+const router = useRouter();
+
 const navLinks = [
   { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard/employee" },
   { icon: FileText, label: "My Tickets", to: "/tickets" },
@@ -174,6 +181,7 @@ const ticketColumns = [
   { key: "priority", label: "Priority", type: "priority" },
   { key: "status", label: "Status", type: "status" },
   { key: "createdAt", label: "Date" },
+  { key: "view", label: "", type: "action", actionLabel: "View" },
 ];
 
 const loading = ref(true);
@@ -206,18 +214,21 @@ const quickLinks = [
     title: "Submit a Ticket",
     description: "Report a new IT issue or request",
     color: "#14B8A6",
+    onClick: () => router.push("/tickets/create"),
   },
   {
     icon: Search,
     title: "Check Ticket Status",
     description: "Track the progress of your tickets",
     color: "#3B82F6",
+    onClick: () => router.push("/tickets"),
   },
   {
     icon: Headphones,
     title: "Contact IT Support",
     description: "Reach the helpdesk team directly",
     color: "#8B5CF6",
+    onClick: () => router.push("/tickets"),
   },
 ];
 

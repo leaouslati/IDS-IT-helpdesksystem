@@ -30,7 +30,8 @@
           <tr
             v-for="ticket in tickets"
             :key="ticket.id"
-            class="hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors duration-150"
+            class="hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors duration-150 cursor-pointer"
+            @click="emit('row-click', ticket)"
           >
             <td
               v-for="col in columns"
@@ -52,7 +53,7 @@
               <template v-else-if="col.type === 'action'">
                 <button
                   v-if="!col.showIf || col.showIf(ticket)"
-                  @click="emit('action-click', ticket)"
+                  @click.stop="emit('action-click', ticket)"
                   class="text-xs font-semibold text-[#14B8A6] hover:text-teal-600 transition-colors duration-150"
                 >
                   {{
@@ -90,7 +91,7 @@ defineProps({
   columns: { type: Array, default: () => [] },
   title: { type: String, default: "Tickets" },
 });
-const emit = defineEmits(["action-click"]);
+const emit = defineEmits(["action-click", "row-click"]);
 
 function statusClass(status) {
   const base = "px-2.5 py-0.5 rounded-full text-[11px] font-semibold";

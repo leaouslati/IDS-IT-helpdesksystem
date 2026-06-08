@@ -2,8 +2,7 @@
   <AppLayout
     :navLinks="navLinks"
     pageTitle="Dashboard"
-    :notificationCount="data?.pendingResponse ?? 0"
-    :showCreateTicket="false"
+    :notificationCount="data?.inProgress ?? 0"
   >
     <!-- Loading -->
     <div v-if="loading" class="flex items-center justify-center min-h-[60vh]">
@@ -63,9 +62,9 @@
           :icon="CheckCircle2"
         />
         <StatCard
-          title="Pending"
-          :value="data?.pendingResponse ?? 0"
-          color="#F59E0B"
+          title="In Progress"
+          :value="data?.inProgress ?? 0"
+          color="#14B8A6"
           :icon="Clock"
         />
         <StatCard
@@ -83,6 +82,7 @@
             title="Tickets Assigned to Me"
             :tickets="processedTickets"
             :columns="ticketColumns"
+            @row-click="startWorking"
             @action-click="startWorking"
           />
         </div>
@@ -98,6 +98,7 @@
           <button
             v-for="action in quickActions"
             :key="action.title"
+            @click="action.onClick()"
             class="w-full flex items-center gap-3 bg-white dark:bg-[#1A1D2E] rounded-xl p-3 shadow-sm border border-gray-100 dark:border-white/[0.05] transition-colors duration-200 text-left group hover:bg-gray-50 dark:hover:bg-white/[0.04]"
           >
             <div
@@ -135,6 +136,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from "vue";
+import { useRouter } from "vue-router";
 import {
   LayoutDashboard,
   FileText,
@@ -155,6 +157,8 @@ import StatCard from "../../components/dashboard/StatCard.vue";
 import TicketTable from "../../components/dashboard/TicketTable.vue";
 import api from "../../api/axios";
 
+const router = useRouter();
+
 const navLinks = [
   { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard/agent" },
   { icon: FileText, label: "My Tickets", to: "/tickets" },
@@ -166,20 +170,23 @@ const quickActions = [
   {
     icon: RefreshCw,
     title: "Update Ticket Status",
-    description: "Change the status of an assigned ticket quickly",
+    description: "Click a ticket below to update its status",
     color: "#14B8A6",
+    onClick: () => router.push("/tickets"),
   },
   {
     icon: MessageSquare,
     title: "Add Comment",
-    description: "Post an update or note on a ticket thread",
+    description: "Open a ticket to post an update or note",
     color: "#3B82F6",
+    onClick: () => router.push("/tickets"),
   },
   {
     icon: AlertTriangle,
     title: "Escalate Ticket",
-    description: "Flag a ticket that needs urgent attention",
+    description: "Open a ticket to flag it as urgent",
     color: "#EF4444",
+    onClick: () => router.push("/tickets"),
   },
 ];
 
@@ -221,18 +228,7 @@ async function fetchData() {
 onMounted(fetchData);
 
 async function startWorking(ticket) {
-  if (ticket.status !== "Open") return;
-  try {
-    await api.put(`/tickets/${ticket.id}/status`, {
-      statusName: "In Progress",
-    });
-    await fetchData();
-  } catch (e) {
-    console.error(
-      "Failed to start ticket:",
-      e.response?.data?.message ?? e.message
-    );
-  }
+  router.push(`/tickets/${ticket.id}`);
 }
 
 const processedTickets = computed(() =>
