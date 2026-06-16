@@ -42,4 +42,7 @@ export const ticketApi = {
   getAgentsAvailability(ticketId) {
     return api.get(`/ticket/${ticketId}/agents-availability`);
   },
+  logHours(ticketId, data) {
+    return api.post(`/ticket/${ticketId}/hours`, data);
+  },
 };

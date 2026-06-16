@@ -62,16 +62,24 @@
               {{ ticket.title }}
             </h1>
             <!-- Badges -->
-            <div class="flex flex-wrap items-center gap-1.5 mt-2">
+            <div class="flex flex-wrap items-center gap-2 mt-2">
               <StatusBadge :status="ticket.status" />
-              <PriorityBadge :priority="ticket.priority" />
               <EscalatedBadge :isEscalated="ticket.isEscalated" />
-              <span
-                v-if="ticket.category"
-                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-400"
-              >
-                <Tag :size="9" />
-                {{ ticket.category }}
+              <span class="flex items-center gap-1">
+                <component
+                  :is="priorityIcon"
+                  :size="13"
+                  :class="priorityIconClass"
+                />
+                <span class="text-[12px] text-gray-400 dark:text-gray-500">{{
+                  ticket.priority
+                }}</span>
+              </span>
+              <span v-if="ticket.category" class="flex items-center gap-1">
+                <Tag :size="12" class="text-gray-400 dark:text-gray-500" />
+                <span class="text-[12px] text-gray-400 dark:text-gray-500">{{
+                  ticket.category
+                }}</span>
               </span>
             </div>
           </div>
@@ -118,6 +126,16 @@
             </div>
           </div>
 
+          <!-- Log Hours (agent, any time while active) -->
+          <button
+            v-if="ticket.canLogHours"
+            @click="openLogHoursManually"
+            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-900/10 border border-teal-200 dark:border-teal-800 transition-all"
+          >
+            <Clock :size="14" />
+            Log Hours
+          </button>
+
           <!-- Escalate -->
           <button
             v-if="ticket.canEscalate && !ticket.isEscalated"
@@ -140,8 +158,42 @@
         </div>
       </div>
 
+      <!-- Tabs (Manager / Admin only) -->
+      <div
+        v-if="role === 'Manager' || role === 'Admin'"
+        class="flex gap-1 bg-gray-100 dark:bg-white/5 p-1 rounded-lg w-fit"
+      >
+        <button
+          v-for="tab in detailTabs"
+          :key="tab.key"
+          @click="activeDetailTab = tab.key"
+          class="px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-150"
+          :class="
+            activeDetailTab === tab.key
+              ? 'bg-white dark:bg-[#1A1D2E] text-[#0F172A] dark:text-white shadow-sm'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+          "
+        >
+          {{ tab.label }}
+          <span
+            v-if="tab.count != null"
+            class="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+            :class="
+              activeDetailTab === tab.key
+                ? 'bg-[#14B8A6]/20 text-[#14B8A6]'
+                : 'bg-gray-200 dark:bg-white/10 text-gray-500'
+            "
+          >
+            {{ tab.count }}
+          </span>
+        </button>
+      </div>
+
       <!-- Two-column layout -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div
+        v-if="activeDetailTab === 'details'"
+        class="grid grid-cols-1 lg:grid-cols-3 gap-5"
+      >
         <!-- LEFT column (2/3) -->
         <div class="lg:col-span-2 space-y-5">
           <!-- Ticket info / edit card -->
@@ -208,6 +260,23 @@
                   </p>
                   <p class="text-sm text-[#0F172A] dark:text-gray-200">
                     {{ formatDate(ticket.updatedAt) }}
+                  </p>
+                </div>
+
+                <!-- Total hours — visible to Admin, Manager, and assigned Agent only -->
+                <div
+                  v-if="
+                    ['Admin', 'Manager'].includes(role) || ticket.canLogHours
+                  "
+                  class="col-span-2"
+                >
+                  <p
+                    class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-0.5"
+                  >
+                    Total Hours Worked
+                  </p>
+                  <p class="text-sm font-semibold text-[#14B8A6]">
+                    {{ (ticket.totalHoursWorked || 0).toFixed(2) }}h
                   </p>
                 </div>
               </div>
@@ -322,20 +391,29 @@
             </h3>
             <CommentThread
               :comments="comments"
-              :current-user-id="authStore.user?.id"
+              :current-user-id="authStore.user?.userId"
               :current-user-role="authStore.userRole"
               :loading="commentsLoading"
             />
           </div>
 
-          <!-- Comment editor -->
+          <!-- Comment editor — hidden when ticket is resolved -->
           <CommentEditor
+            v-if="ticket.status !== 'Resolved'"
             :ticket-id="ticketId"
             :can-mark-internal="
               ['Agent', 'Manager', 'Admin'].includes(authStore.userRole)
             "
             @comment-added="onCommentAdded"
           />
+          <div
+            v-else
+            class="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/[0.06] text-sm text-gray-400 dark:text-gray-500"
+          >
+            <Lock :size="14" class="flex-shrink-0" />
+            This ticket is {{ ticket.status.toLowerCase() }} — commenting and
+            file uploads are disabled.
+          </div>
         </div>
 
         <!-- RIGHT column (1/3) -->
@@ -412,23 +490,26 @@
             </h3>
             <AttachmentList :attachments="ticket.attachments || []" />
           </div>
-
-          <!-- Activity timeline -->
-          <div
-            class="bg-white dark:bg-[#1A1D2E] rounded-xl border border-gray-100 dark:border-white/[0.06] shadow-sm p-4"
-          >
-            <h3
-              class="text-sm font-semibold text-[#0F172A] dark:text-white mb-4 flex items-center gap-2"
-            >
-              <Activity :size="14" class="text-gray-400" />
-              Activity History
-              <span class="ml-auto text-xs text-gray-400">{{
-                (ticket.activityLog || []).length
-              }}</span>
-            </h3>
-            <StatusTimeline :activity-log="ticket.activityLog || []" />
-          </div>
         </div>
+      </div>
+
+      <!-- Activity History tab panel -->
+      <div
+        v-if="activeDetailTab === 'activity'"
+        class="bg-white dark:bg-[#1A1D2E] rounded-xl border border-gray-100 dark:border-white/[0.06] shadow-sm p-5"
+      >
+        <h3
+          class="text-sm font-semibold text-[#0F172A] dark:text-white mb-5 flex items-center gap-2"
+        >
+          <Activity :size="14" class="text-gray-400" />
+          Activity History
+          <span
+            class="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400"
+          >
+            {{ (ticket.activityLog || []).length }}
+          </span>
+        </h3>
+        <StatusTimeline :activity-log="ticket.activityLog || []" />
       </div>
     </template>
 
@@ -724,6 +805,13 @@
         </div>
       </Transition>
     </Teleport>
+    <!-- ─── Log Hours Modal ─── -->
+    <LogHoursModal
+      v-model="showLogHoursModal"
+      :ticket-id="ticketId"
+      :is-dismissable="logHoursIsDismissable"
+      @logged="onHoursLogged"
+    />
   </AppLayout>
 </template>
 
@@ -743,6 +831,7 @@ import {
   MessageSquare,
   Paperclip,
   Activity,
+  Lock,
   AlertCircle,
   UserCheck,
   LayoutDashboard,
@@ -751,11 +840,15 @@ import {
   User,
   BarChart2,
   X,
+  Clock,
+  Flame,
+  ArrowUp,
+  Minus,
+  ArrowDown,
 } from "lucide-vue-next";
 
 import AppLayout from "../../components/layout/AppLayout.vue";
 import StatusBadge from "../../components/tickets/StatusBadge.vue";
-import PriorityBadge from "../../components/tickets/PriorityBadge.vue";
 import EscalatedBadge from "../../components/tickets/EscalatedBadge.vue";
 import CommentThread from "../../components/tickets/CommentThread.vue";
 import CommentEditor from "../../components/tickets/CommentEditor.vue";
@@ -763,6 +856,7 @@ import AttachmentList from "../../components/tickets/AttachmentList.vue";
 import StatusTimeline from "../../components/tickets/StatusTimeline.vue";
 import RichTextEditor from "../../components/ui/RichTextEditor.vue";
 import LoadingSpinner from "../../components/ui/LoadingSpinner.vue";
+import LogHoursModal from "../../components/tickets/LogHoursModal.vue";
 import { useTicketStore } from "../../store/ticket";
 import { useAuthStore } from "../../store/auth";
 import { useToastStore } from "../../store/toast";
@@ -793,6 +887,10 @@ const saving = ref(false);
 const deleting = ref(false);
 const escalating = ref(false);
 
+// Hours logging modal
+const showLogHoursModal = ref(false);
+const logHoursIsDismissable = ref(false); // true when shown automatically after ticket close
+
 const editMode = ref(false);
 const editForm = ref({
   title: "",
@@ -809,6 +907,7 @@ const statusDropRef = ref(null);
 
 const escalateReason = ref("");
 const escalateError = ref("");
+const activeDetailTab = ref("details");
 
 const escalateCharCount = computed(
   () => escalateReason.value.replace(/<[^>]*>/g, "").trim().length
@@ -848,6 +947,28 @@ const navLinks = computed(() => {
 
 const availableStatuses = computed(() => ticketStore.statuses);
 
+const detailTabs = computed(() => [
+  { key: "details", label: "Details" },
+  {
+    key: "activity",
+    label: "Activity History",
+    count: (ticket.value?.activityLog || []).length,
+  },
+]);
+
+const priorityMap = {
+  Critical: { icon: Flame, cls: "text-red-500" },
+  High: { icon: ArrowUp, cls: "text-orange-500" },
+  Medium: { icon: Minus, cls: "text-yellow-500 dark:text-yellow-400" },
+  Low: { icon: ArrowDown, cls: "text-gray-400 dark:text-gray-500" },
+};
+const priorityIcon = computed(
+  () => priorityMap[ticket.value?.priority]?.icon ?? Minus
+);
+const priorityIconClass = computed(
+  () => priorityMap[ticket.value?.priority]?.cls ?? "text-gray-400"
+);
+
 const statusBorderClass = computed(() => {
   const map = {
     Open: "border-l-4 border-l-blue-400 border-gray-100 dark:border-white/[0.06]",
@@ -857,8 +978,6 @@ const statusBorderClass = computed(() => {
       "border-l-4 border-l-yellow-400 border-gray-100 dark:border-white/[0.06]",
     Resolved:
       "border-l-4 border-l-green-400 border-gray-100 dark:border-white/[0.06]",
-    Closed:
-      "border-l-4 border-l-gray-400 border-gray-100 dark:border-white/[0.06]",
     Escalated:
       "border-l-4 border-l-orange-400 border-gray-100 dark:border-white/[0.06]",
   };
@@ -954,9 +1073,25 @@ async function doUpdateStatus(statusName) {
     await ticketApi.updateStatus(ticketId.value, statusName);
     toastStore.show(`Status updated to ${statusName}`);
     await loadTicket();
+
+    // After closing or resolving, prompt the agent to log hours
+    if (statusName === "Resolved" && role.value === "Agent") {
+      logHoursIsDismissable.value = true;
+      showLogHoursModal.value = true;
+    }
   } catch {
     toastStore.show("Failed to update status", "error");
   }
+}
+
+function openLogHoursManually() {
+  logHoursIsDismissable.value = false;
+  showLogHoursModal.value = true;
+}
+
+async function onHoursLogged() {
+  toastStore.show("Hours logged successfully");
+  await loadTicket(); // refresh totalHoursWorked on the ticket
 }
 
 async function doAssign(agentUserId) {

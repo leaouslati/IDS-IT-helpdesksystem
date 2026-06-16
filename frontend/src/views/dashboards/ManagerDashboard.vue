@@ -1,7 +1,7 @@
 <template>
   <AppLayout
     :navLinks="navLinks"
-    pageTitle="Dashboard"
+    :pageTitle="`Welcome back, ${authStore.user?.firstName || 'Manager'}`"
     :notificationCount="data?.unassignedTickets ?? 0"
     :showCreateTicket="false"
   >
@@ -56,13 +56,6 @@
           >
             <Plus :size="14" />
             New Ticket
-          </button>
-          <button
-            @click="router.push('/tickets')"
-            class="flex-shrink-0 px-4 py-2 rounded-lg border border-gray-200 dark:border-white/10 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
-          >
-            <FileText :size="14" />
-            All Tickets
           </button>
           <button
             @click="toastStore.show('Report export coming soon', 'info')"
@@ -344,10 +337,12 @@ import AppLayout from "../../components/layout/AppLayout.vue";
 import StatCard from "../../components/dashboard/StatCard.vue";
 import TicketTable from "../../components/dashboard/TicketTable.vue";
 import { useToastStore } from "../../store/toast";
+import { useAuthStore } from "../../store/auth";
 import api from "../../api/axios";
 
 const router = useRouter();
 const toastStore = useToastStore();
+const authStore = useAuthStore();
 
 ChartJS.register(
   CategoryScale,

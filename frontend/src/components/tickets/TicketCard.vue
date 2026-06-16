@@ -1,12 +1,12 @@
 <template>
   <div
     @click="navigate"
-    class="group bg-white dark:bg-[#1A1D2E] rounded-xl border border-gray-100 dark:border-white/[0.06] shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer overflow-hidden"
+    class="group bg-white dark:bg-[#1A1D2E] rounded-xl border border-gray-100 dark:border-white/[0.06] shadow-sm cursor-pointer overflow-hidden"
     :class="ticket.isEscalated ? 'border-l-4 border-l-orange-400' : ''"
   >
     <!-- Top section -->
     <div class="p-4">
-      <!-- Ref + badges row -->
+      <!-- Ref + copy + status row -->
       <div class="flex items-start justify-between gap-2 mb-3">
         <div class="flex items-center gap-1.5">
           <span
@@ -22,26 +22,37 @@
             <Copy :size="11" />
           </button>
         </div>
-        <EscalatedBadge :isEscalated="ticket.isEscalated" />
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+          <EscalatedBadge :isEscalated="ticket.isEscalated" />
+          <StatusBadge :status="ticket.status" />
+        </div>
       </div>
 
       <!-- Title -->
       <h3
-        class="text-[14px] font-semibold text-[#0F172A] dark:text-white leading-snug mb-3 line-clamp-2 group-hover:text-[#14B8A6] transition-colors"
+        class="text-[14px] font-semibold text-[#0F172A] dark:text-white leading-snug mb-2 line-clamp-2 group-hover:text-[#14B8A6] transition-colors"
       >
         {{ ticket.title }}
       </h3>
 
-      <!-- Status + Priority badges -->
-      <div class="flex flex-wrap items-center gap-1.5 mb-3">
-        <StatusBadge :status="ticket.status" />
-        <PriorityBadge :priority="ticket.priority" />
-        <span
-          v-if="ticket.category"
-          class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-400"
-        >
-          {{ ticket.category }}
-        </span>
+      <!-- Priority + Category row (icon + text, no pills) -->
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-1">
+          <component :is="priorityIcon" :size="12" :class="priorityIconClass" />
+          <span class="text-[11px] text-gray-400 dark:text-gray-500">{{
+            ticket.priority
+          }}</span>
+        </div>
+        <div v-if="ticket.category" class="flex items-center gap-1">
+          <Tag
+            :size="12"
+            class="text-gray-400 dark:text-gray-500 flex-shrink-0"
+          />
+          <span
+            class="text-[11px] text-gray-400 dark:text-gray-500 truncate max-w-[120px]"
+            >{{ ticket.category }}</span
+          >
+        </div>
       </div>
     </div>
 
@@ -76,10 +87,19 @@
 </template>
 
 <script setup>
+import { computed } from "vue";
 import { useRouter } from "vue-router";
-import { Copy, User, MessageSquare } from "lucide-vue-next";
+import {
+  Copy,
+  User,
+  MessageSquare,
+  Flame,
+  ArrowUp,
+  Minus,
+  ArrowDown,
+  Tag,
+} from "lucide-vue-next";
 import StatusBadge from "./StatusBadge.vue";
-import PriorityBadge from "./PriorityBadge.vue";
 import EscalatedBadge from "./EscalatedBadge.vue";
 
 const props = defineProps({
@@ -87,6 +107,20 @@ const props = defineProps({
 });
 
 const router = useRouter();
+
+const priorityMap = {
+  Critical: { icon: Flame, cls: "text-red-500" },
+  High: { icon: ArrowUp, cls: "text-orange-500" },
+  Medium: { icon: Minus, cls: "text-yellow-500 dark:text-yellow-400" },
+  Low: { icon: ArrowDown, cls: "text-gray-400 dark:text-gray-500" },
+};
+
+const priorityIcon = computed(
+  () => priorityMap[props.ticket.priority]?.icon ?? Minus
+);
+const priorityIconClass = computed(
+  () => priorityMap[props.ticket.priority]?.cls ?? "text-gray-400"
+);
 
 function navigate() {
   router.push(`/tickets/${props.ticket.id}`);
@@ -98,7 +132,11 @@ function copyRef() {
 
 function formatDate(dateStr) {
   if (!dateStr) return "—";
-  const d = new Date(dateStr);
+  // Ensure UTC is parsed correctly when the backend omits the Z suffix
+  const normalized = /[Zz]|[+-]\d{2}:\d{2}$/.test(dateStr)
+    ? dateStr
+    : dateStr + "Z";
+  const d = new Date(normalized);
   const now = new Date();
   const diff = Math.floor((now - d) / 1000);
   if (diff < 60) return "Just now";

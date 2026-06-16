@@ -11,11 +11,13 @@ namespace backend.Presentation.Controllers
     [Authorize]
     public class TicketController : ControllerBase
     {
-        private readonly ITicketService _ticketService;
+        private readonly ITicketService         _ticketService;
+        private readonly ITicketHoursLogService _hoursLogService;
 
-        public TicketController(ITicketService ticketService)
+        public TicketController(ITicketService ticketService, ITicketHoursLogService hoursLogService)
         {
-            _ticketService = ticketService;
+            _ticketService   = ticketService;
+            _hoursLogService = hoursLogService;
         }
 
         private int    CurrentUserId => int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
@@ -88,7 +90,7 @@ namespace backend.Presentation.Controllers
         }
 
         // ── PUT /api/ticket/{ticketId}/status ─────────────────────────────────
-        // Agent only; cannot revert to Open or change Resolved/Closed
+        // Agent only; cannot revert to Open or change Resolved
         [HttpPut("{ticketId}/status")]
         [Authorize(Roles = "Agent")]
         public async Task<IActionResult> UpdateTicketStatus(int ticketId, [FromBody] UpdateTicketStatusDto dto)
@@ -110,7 +112,7 @@ namespace backend.Presentation.Controllers
         }
 
         // ── POST /api/ticket/{ticketId}/comment ───────────────────────────────
-        // All roles; not allowed on Closed tickets
+        // All roles; not allowed on Resolved tickets
         [HttpPost("{ticketId}/comment")]
         public async Task<IActionResult> AddComment(int ticketId, [FromBody] AddCommentDto dto)
         {
@@ -147,6 +149,17 @@ namespace backend.Presentation.Controllers
             var (agents, error) = await _ticketService.GetAgentsAvailabilityAsync(ticketId, CurrentUserId);
             if (error != null) return ServiceError(error);
             return Ok(agents);
+        }
+
+        // ── POST /api/ticket/{ticketId}/hours ─────────────────────────────────
+        // Agent only; can log hours at any time while ticket is active
+        [HttpPost("{ticketId}/hours")]
+        [Authorize(Roles = "Agent")]
+        public async Task<IActionResult> LogHours(int ticketId, [FromBody] LogHoursDto dto)
+        {
+            var (result, error) = await _hoursLogService.LogHoursAsync(ticketId, dto, CurrentUserId);
+            if (error != null) return ServiceError(error);
+            return CreatedAtAction(nameof(GetTicketById), new { id = ticketId }, result);
         }
     }
 }

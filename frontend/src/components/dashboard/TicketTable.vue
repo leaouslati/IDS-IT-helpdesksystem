@@ -103,7 +103,6 @@ function statusClass(status) {
       "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
     Resolved:
       "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-    Closed: "bg-gray-100 text-gray-600 dark:bg-gray-700/50 dark:text-gray-400",
     Escalated:
       "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
   };

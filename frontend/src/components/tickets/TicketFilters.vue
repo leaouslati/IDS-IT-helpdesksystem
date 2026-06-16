@@ -54,8 +54,9 @@
         </option>
       </select>
 
-      <!-- Escalated toggle -->
+      <!-- Escalated toggle (hidden for Employee role) -->
       <button
+        v-if="showEscalated"
         @click="toggleEscalated"
         class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-all duration-150"
         :class="
@@ -104,6 +105,7 @@ let searchDebounceTimer = null;
 
 defineProps({
   showUnassigned: { type: Boolean, default: false },
+  showEscalated: { type: Boolean, default: true },
   statuses: { type: Array, default: () => [] },
   priorities: { type: Array, default: () => [] },
   categories: { type: Array, default: () => [] },
