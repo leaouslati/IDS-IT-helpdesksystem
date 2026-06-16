@@ -96,11 +96,6 @@
           >
             {{ pageTitle }}
           </h2>
-          <p
-            class="text-[12px] text-gray-400 dark:text-gray-500 leading-none mt-0.5"
-          >
-            Welcome Back, {{ authStore.userName || "User" }}
-          </p>
         </div>
 
         <!-- Right actions -->

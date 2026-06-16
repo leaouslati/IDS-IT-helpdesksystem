@@ -19,6 +19,7 @@ namespace backend.Infrastructure.Data
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<ActivityLog> ActivityLogs { get; set; }
         public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
+        public DbSet<TicketHoursLog> TicketHoursLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -63,6 +64,22 @@ namespace backend.Infrastructure.Data
                 .WithMany()
                 .HasForeignKey(a => a.CommentId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TicketHoursLog>()
+                .HasOne(h => h.Ticket)
+                .WithMany()
+                .HasForeignKey(h => h.TicketId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<TicketHoursLog>()
+                .HasOne(h => h.Agent)
+                .WithMany()
+                .HasForeignKey(h => h.AgentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TicketHoursLog>()
+                .Property(h => h.HoursWorked)
+                .HasPrecision(8, 2);
         }
     }
 }

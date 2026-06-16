@@ -1,36 +1,24 @@
 using backend.Application.DTOs;
 using backend.Application.Interfaces;
-using backend.Infrastructure.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace backend.Application.Services
 {
     public class LookupService : ILookupService
     {
-        private readonly AppDbContext _context;
+        private readonly ILookupRepository _repo;
 
-        public LookupService(AppDbContext context)
+        public LookupService(ILookupRepository repo)
         {
-            _context = context;
+            _repo = repo;
         }
 
-        public async Task<IEnumerable<CategoryDto>> GetCategoriesAsync() =>
-            await _context.Categories
-                .OrderBy(c => c.Name)
-                .Select(c => new CategoryDto { Id = c.Id, Name = c.Name })
-                .ToListAsync();
+        public Task<IEnumerable<CategoryDto>> GetCategoriesAsync() =>
+            _repo.GetCategoriesAsync();
 
-        public async Task<IEnumerable<PriorityDto>> GetPrioritiesAsync() =>
-            await _context.Priorities
-                .OrderBy(p => p.Id)
-                .Select(p => new PriorityDto { Id = p.Id, Name = p.Name })
-                .ToListAsync();
+        public Task<IEnumerable<PriorityDto>> GetPrioritiesAsync() =>
+            _repo.GetPrioritiesAsync();
 
-        public async Task<IEnumerable<TicketStatusDto>> GetStatusesAsync() =>
-            await _context.TicketStatuses
-                .Where(s => s.Name != "Pending")
-                .OrderBy(s => s.Id)
-                .Select(s => new TicketStatusDto { Id = s.Id, Name = s.Name })
-                .ToListAsync();
+        public Task<IEnumerable<TicketStatusDto>> GetStatusesAsync() =>
+            _repo.GetStatusesAsync();
     }
 }

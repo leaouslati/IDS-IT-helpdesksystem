@@ -28,7 +28,7 @@
         class="flex gap-3"
         :class="isRightSide(comment) ? 'flex-row-reverse' : ''"
       >
-        <!-- Avatar -->
+        <!-- Avatar: initials derived from userName -->
         <div
           class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-[11px] font-bold mt-0.5"
           :class="
@@ -36,8 +36,9 @@
               ? 'bg-[#14B8A6]/20 text-[#14B8A6]'
               : 'bg-gray-200 text-gray-600 dark:bg-white/10 dark:text-gray-300'
           "
+          :title="comment.userName"
         >
-          {{ initials(comment.authorName) }}
+          {{ initials(comment.userName) }}
         </div>
 
         <!-- Bubble -->
@@ -53,10 +54,10 @@
             <span
               class="text-[12px] font-semibold text-[#0F172A] dark:text-white"
             >
-              {{ comment.authorName }}
+              {{ comment.userName }}
             </span>
             <span class="text-[10px] text-gray-400 capitalize">
-              {{ comment.authorRole }}
+              {{ comment.userRole }}
             </span>
             <Lock
               v-if="comment.isInternal"
@@ -71,7 +72,7 @@
 
           <!-- Escalation comment -->
           <div
-            v-if="comment.isEscalation"
+            v-if="comment.isEscalationComment"
             class="px-4 py-3 rounded-xl border-l-4 border-orange-400 bg-orange-50 dark:bg-orange-900/10 text-sm text-orange-800 dark:text-orange-300"
           >
             <div class="flex items-center gap-1.5 mb-1.5">
@@ -143,15 +144,17 @@
 <script setup>
 import { Lock, AlertTriangle, Paperclip } from "lucide-vue-next";
 
-defineProps({
+const props = defineProps({
   comments: { type: Array, default: () => [] },
   currentUserId: { type: [String, Number], default: null },
   currentUserRole: { type: String, default: "" },
   loading: { type: Boolean, default: false },
 });
 
+// Right side = your own comment (WhatsApp style). Use numeric comparison because
+// authStore may return the id as a string depending on JWT decoding.
 function isRightSide(comment) {
-  return ["Agent", "Manager", "Admin"].includes(comment.authorRole);
+  return Number(comment.userId) === Number(props.currentUserId);
 }
 
 function initials(name) {
@@ -165,7 +168,11 @@ function initials(name) {
 
 function timeAgo(dateStr) {
   if (!dateStr) return "";
-  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  // Append Z so the browser treats the value as UTC, not local time
+  const normalized = /[Zz]|[+-]\d{2}:\d{2}$/.test(dateStr)
+    ? dateStr
+    : dateStr + "Z";
+  const diff = Math.floor((Date.now() - new Date(normalized).getTime()) / 1000);
   if (diff < 60) return "just now";
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;

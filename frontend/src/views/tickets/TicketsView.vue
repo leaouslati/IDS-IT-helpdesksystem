@@ -55,6 +55,7 @@
       <!-- Filters -->
       <TicketFilters
         :show-unassigned="isManager"
+        :show-escalated="role !== 'Employee'"
         :statuses="ticketStore.statuses"
         :priorities="ticketStore.priorities"
         :categories="ticketStore.categories"

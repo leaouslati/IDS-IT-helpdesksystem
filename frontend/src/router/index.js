@@ -84,6 +84,12 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: "/knowledge-base",
+    name: "KnowledgeBase",
+    component: () => import("../views/KnowledgeBaseView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
     path: "/unauthorized",
     name: "Unauthorized",
     component: () => import("../views/UnauthorizedView.vue"),

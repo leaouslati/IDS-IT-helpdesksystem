@@ -225,10 +225,10 @@ const quickLinks = [
   },
   {
     icon: Headphones,
-    title: "Contact IT Support",
+    title: "IT Support FAQs",
     description: "Reach the helpdesk team directly",
     color: "#8B5CF6",
-    onClick: () => router.push("/tickets"),
+    onClick: () => router.push("/knowledge-base"),
   },
 ];
 

@@ -80,7 +80,9 @@ namespace backend.Application.DTOs
         public bool CanAssign { get; set; }
         public bool CanUpdateStatus { get; set; }
         public bool CanEscalate { get; set; }
+        public bool CanLogHours { get; set; }
         public string? EscalationReason { get; set; }
+        public decimal TotalHoursWorked { get; set; }
         public List<TicketCommentDto> Comments { get; set; } = new();
         public List<TicketAttachmentDto> Attachments { get; set; } = new();
         public List<TicketActivityLogDto> ActivityLog { get; set; } = new();
@@ -89,9 +91,11 @@ namespace backend.Application.DTOs
     public class TicketActivityLogDto
     {
         public string Action { get; set; } = string.Empty;
+        public string? Details { get; set; }
         public string? FromValue { get; set; }
         public string? ToValue { get; set; }
         public string UserName { get; set; } = string.Empty;
+        public string? UserRole { get; set; }
         public DateTime LoggedAt { get; set; }
     }
 
@@ -100,8 +104,10 @@ namespace backend.Application.DTOs
         public int Id { get; set; }
         public int UserId { get; set; }
         public string UserName { get; set; } = string.Empty;
+        public string UserRole { get; set; } = string.Empty;
         public string Content { get; set; } = string.Empty;
         public bool IsEscalationComment { get; set; }
+        public bool IsInternal { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 

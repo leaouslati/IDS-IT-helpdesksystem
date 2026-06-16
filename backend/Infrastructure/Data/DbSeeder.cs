@@ -52,8 +52,7 @@ namespace backend.Infrastructure.Data
                     new TicketStatus { Name = "Open" },
                     new TicketStatus { Name = "In Progress" },
                     new TicketStatus { Name = "Pending" },
-                    new TicketStatus { Name = "Resolved" },
-                    new TicketStatus { Name = "Closed" }
+                    new TicketStatus { Name = "Resolved" }
                 );
                 await context.SaveChangesAsync();
             }
@@ -214,7 +213,6 @@ namespace backend.Infrastructure.Data
                 var statInProgress = await context.TicketStatuses.FirstAsync(s => s.Name == "In Progress");
                 var statPending    = await context.TicketStatuses.FirstAsync(s => s.Name == "Pending");
                 var statResolved   = await context.TicketStatuses.FirstAsync(s => s.Name == "Resolved");
-                var statClosed     = await context.TicketStatuses.FirstAsync(s => s.Name == "Closed");
 
                 var agent1 = await context.Users.FirstAsync(u => u.Email == "agent@helpdesk.com");
                 var agent2 = await context.Users.FirstAsync(u => u.Email == "mike@helpdesk.com");
@@ -369,7 +367,7 @@ namespace backend.Infrastructure.Data
                     {
                         ReferenceNumber = "TKT-015", Title = "Keyboard not working",
                         Description = "Several keys on my keyboard are unresponsive. Tried restarting but issue persists.",
-                        CategoryId = catHardware.Id, PriorityId = priLow.Id, TicketStatusId = statClosed.Id,
+                        CategoryId = catHardware.Id, PriorityId = priLow.Id, TicketStatusId = statResolved.Id,
                         CreatedByUserId = emp3.Id, AssignedToUserId = agent1.Id, DepartmentId = financeDept.Id,
                         IsEscalated = false, CreatedAt = now.AddDays(-6), UpdatedAt = now.AddDays(-4)
                     },
@@ -443,7 +441,6 @@ namespace backend.Infrastructure.Data
                 var priMedium   = await context.Priorities.FirstAsync(p => p.Name == "Medium");
                 var priLow      = await context.Priorities.FirstAsync(p => p.Name == "Low");
                 var statResolved = await context.TicketStatuses.FirstAsync(s => s.Name == "Resolved");
-                var statClosed   = await context.TicketStatuses.FirstAsync(s => s.Name == "Closed");
 
                 context.Tickets.AddRange(
                     new Ticket
@@ -460,7 +457,7 @@ namespace backend.Infrastructure.Data
                     {
                         ReferenceNumber = "TKT-022", Title = "Network switch replaced",
                         Description = "Faulty network switch on floor 2 replaced. Connectivity restored for all users.",
-                        CategoryId = catNetwork.Id, PriorityId = priLow.Id, TicketStatusId = statClosed.Id,
+                        CategoryId = catNetwork.Id, PriorityId = priLow.Id, TicketStatusId = statResolved.Id,
                         CreatedByUserId = emp1It.Id, AssignedToUserId = agent1It.Id, DepartmentId = itDept.Id,
                         IsEscalated = false,
                         CreatedAt = DateTime.UtcNow.AddDays(-12),
@@ -521,7 +518,7 @@ namespace backend.Infrastructure.Data
                     new Notification { UserId = emp3.Id,    Message = "Your ticket TKT-003 has been escalated.",                                  IsRead = false, CreatedAt = DateTime.UtcNow.AddDays(-20) },
                     new Notification { UserId = manager.Id, Message = "Ticket TKT-009 is unassigned and requires attention (Critical priority).", IsRead = false, CreatedAt = DateTime.UtcNow.AddDays(-12) },
                     new Notification { UserId = emp2.Id,    Message = "Your ticket TKT-014 has been resolved.",                                   IsRead = true,  CreatedAt = DateTime.UtcNow.AddDays(-5)  },
-                    new Notification { UserId = emp3.Id,    Message = "Your ticket TKT-015 has been closed.",                                     IsRead = true,  CreatedAt = DateTime.UtcNow.AddDays(-4)  },
+                    new Notification { UserId = emp3.Id,    Message = "Your ticket TKT-015 has been resolved.",                                     IsRead = true,  CreatedAt = DateTime.UtcNow.AddDays(-4)  },
                     new Notification { UserId = emp4.Id,    Message = "Your ticket TKT-016 has been resolved.",                                   IsRead = true,  CreatedAt = DateTime.UtcNow.AddDays(-3)  },
                     new Notification { UserId = manager.Id, Message = "Ticket TKT-012 is unassigned and marked Critical.",                        IsRead = false, CreatedAt = DateTime.UtcNow.AddDays(-9)  },
                     new Notification { UserId = emp4.Id,    Message = "Your ticket TKT-020 requires immediate attention.",                        IsRead = false, CreatedAt = DateTime.UtcNow.AddDays(-1)  },

@@ -6,7 +6,6 @@ const STATIC_STATUSES = [
   { id: 1, name: "Open" },
   { id: 2, name: "In Progress" },
   { id: 4, name: "Resolved" },
-  { id: 5, name: "Closed" },
 ];
 
 export const useTicketStore = defineStore("ticket", {

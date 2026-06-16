@@ -1,428 +1,166 @@
 using backend.Application.DTOs;
 using backend.Application.Interfaces;
-using backend.Domain.Entities;
-using backend.Infrastructure.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace backend.Application.Services
 {
     public class DashboardService : IDashboardService
     {
-        private readonly AppDbContext _context;
+        private readonly IDashboardRepository _repo;
 
-        public DashboardService(AppDbContext context)
+        public DashboardService(IDashboardRepository repo)
         {
-            _context = context;
+            _repo = repo;
         }
 
         public async Task<AdminDashboardDto> GetAdminDashboardAsync()
         {
-            var today = DateTime.UtcNow.Date;
+            var today      = DateTime.UtcNow.Date;
             var sevenDaysAgo = today.AddDays(-6);
 
-            var openTickets = await _context.Tickets
-                .CountAsync(t => t.TicketStatus.Name == "Open");
-
-            var pendingTickets = await _context.Tickets
-                .CountAsync(t => t.TicketStatus.Name == "Pending");
-
-            var resolvedToday = await _context.Tickets
-                .CountAsync(t => t.TicketStatus.Name == "Resolved"
-                    && t.UpdatedAt.HasValue && t.UpdatedAt.Value.Date == today);
-
-            var criticalTickets = await _context.Tickets
-                .CountAsync(t => t.Priority.Name == "Critical"
-                    && t.TicketStatus.Name != "Resolved"
-                    && t.TicketStatus.Name != "Closed");
-
-            var totalUsers = await _context.Users.CountAsync();
-            var activeUsers = await _context.Users.CountAsync(u => u.IsActive);
-            var totalTickets = await _context.Tickets.CountAsync();
-            var escalatedTickets = await _context.Tickets.CountAsync(t => t.IsEscalated);
-
-            var trendTickets = await _context.Tickets
-                .Where(t => t.CreatedAt >= sevenDaysAgo
-                    || (t.UpdatedAt.HasValue && t.UpdatedAt.Value >= sevenDaysAgo && t.TicketStatus.Name == "Resolved"))
-                .Select(t => new { t.CreatedAt, t.UpdatedAt, StatusName = t.TicketStatus.Name })
-                .ToListAsync();
-
-            var ticketTrend = Enumerable.Range(0, 7)
-                .Select(i => today.AddDays(i - 6))
-                .Select(date => new TicketTrendDto
-                {
-                    Date = date.ToString("MMM dd"),
-                    Created = trendTickets.Count(t => t.CreatedAt.Date == date),
-                    Resolved = trendTickets.Count(t =>
-                        t.StatusName == "Resolved"
-                        && t.UpdatedAt.HasValue
-                        && t.UpdatedAt.Value.Date == date)
-                })
-                .ToList();
-
-            var categoryBreakdown = await _context.Tickets
-                .GroupBy(t => t.Category.Name)
-                .Select(g => new CategoryBreakdownDto { Category = g.Key, Count = g.Count() })
-                .ToListAsync();
-
-            var priorityBreakdown = await _context.Tickets
-                .GroupBy(t => t.Priority.Name)
-                .Select(g => new PriorityBreakdownDto { Priority = g.Key, Count = g.Count() })
-                .ToListAsync();
-
-            var recentActivity = await _context.ActivityLogs
-                .Include(a => a.User)
-                .OrderByDescending(a => a.LoggedAt)
-                .Take(10)
-                .Select(a => new RecentActivityDto
-                {
-                    Action = a.Action,
-                    Details = a.Details ?? string.Empty,
-                    UserName = a.User.FirstName + " " + a.User.LastName,
-                    LoggedAt = a.LoggedAt
-                })
-                .ToListAsync();
-
-            var recentTickets = await _context.Tickets
-                .Include(t => t.Category)
-                .Include(t => t.Priority)
-                .Include(t => t.TicketStatus)
-                .Include(t => t.CreatedByUser)
-                .Include(t => t.AssignedToUser)
-                .OrderByDescending(t => t.CreatedAt)
-                .Take(10)
-                .Select(t => new RecentTicketDto
-                {
-                    Id = t.Id,
-                    ReferenceNumber = t.ReferenceNumber,
-                    Title = t.Title,
-                    Category = t.Category.Name,
-                    Priority = t.Priority.Name,
-                    Status = t.TicketStatus.Name,
-                    CreatedBy = t.CreatedByUser.FirstName + " " + t.CreatedByUser.LastName,
-                    AssignedTo = t.AssignedToUser != null
-                        ? t.AssignedToUser.FirstName + " " + t.AssignedToUser.LastName
-                        : null,
-                    IsEscalated = t.IsEscalated,
-                    CreatedAt = t.CreatedAt
-                })
-                .ToListAsync();
+            var openTickets      = await _repo.CountTicketsByStatusNameAsync("Open");
+            var pendingTickets   = await _repo.CountTicketsByStatusNameAsync("Pending");
+            var resolvedToday    = await _repo.CountTicketsResolvedOnDateAsync(today);
+            var criticalTickets  = await _repo.CountActiveCriticalTicketsAsync();
+            var totalUsers       = await _repo.CountUsersAsync();
+            var activeUsers      = await _repo.CountUsersAsync(true);
+            var totalTickets     = await _repo.CountAllTicketsAsync();
+            var escalatedTickets = await _repo.CountEscalatedTicketsAsync();
+            var ticketTrend      = await _repo.GetTicketTrendAsync(sevenDaysAgo);
+            var categoryBreakdown = await _repo.GetCategoryBreakdownAsync();
+            var priorityBreakdown = await _repo.GetPriorityBreakdownAsync();
+            var recentActivity   = await _repo.GetRecentActivityAsync(take: 10);
+            var recentTickets    = await _repo.GetRecentTicketsAsync(take: 10);
 
             return new AdminDashboardDto
             {
-                OpenTickets = openTickets,
-                PendingTickets = pendingTickets,
-                ResolvedToday = resolvedToday,
-                CriticalTickets = criticalTickets,
-                TotalUsers = totalUsers,
-                ActiveUsers = activeUsers,
-                TotalTickets = totalTickets,
-                EscalatedTickets = escalatedTickets,
-                TicketTrend = ticketTrend,
+                OpenTickets       = openTickets,
+                PendingTickets    = pendingTickets,
+                ResolvedToday     = resolvedToday,
+                CriticalTickets   = criticalTickets,
+                TotalUsers        = totalUsers,
+                ActiveUsers       = activeUsers,
+                TotalTickets      = totalTickets,
+                EscalatedTickets  = escalatedTickets,
+                TicketTrend       = ticketTrend,
                 CategoryBreakdown = categoryBreakdown,
                 PriorityBreakdown = priorityBreakdown,
-                RecentActivity = recentActivity,
-                RecentTickets = recentTickets
+                RecentActivity    = recentActivity,
+                RecentTickets     = recentTickets
             };
         }
 
         public async Task<ManagerDashboardDto> GetManagerDashboardAsync(int managerId)
         {
-            var today = DateTime.UtcNow.Date;
-            var weekStart = today.AddDays(-6);
+            var deptId = await _repo.GetUserDepartmentIdAsync(managerId);
+            if (!deptId.HasValue) return new ManagerDashboardDto();
 
-            var deptId = await _context.Users
-                .Where(u => u.Id == managerId)
-                .Select(u => u.DepartmentId)
-                .FirstOrDefaultAsync();
+            var weekStart = DateTime.UtcNow.Date.AddDays(-6);
 
-            if (!deptId.HasValue)
-                return new ManagerDashboardDto();
+            var teamOpenTickets   = await _repo.CountDeptTicketsByStatusNamesAsync(deptId.Value, ["Open", "In Progress"]);
+            var unassignedTickets = await _repo.CountDeptUnassignedTicketsAsync(deptId.Value);
+            var resolvedThisWeek  = await _repo.CountDeptTicketsResolvedSinceAsync(deptId.Value, weekStart);
 
-            IQueryable<Ticket> deptQuery = _context.Tickets.Where(t => t.DepartmentId == deptId.Value);
-
-            var teamOpenTickets = await deptQuery
-                .CountAsync(t => t.TicketStatus.Name == "Open" || t.TicketStatus.Name == "In Progress");
-
-            var unassignedTickets = await deptQuery
-                .CountAsync(t => t.AssignedToUserId == null);
-
-            var resolvedThisWeek = await deptQuery
-                .CountAsync(t => (t.TicketStatus.Name == "Resolved" || t.TicketStatus.Name == "Closed")
-                    && t.UpdatedAt.HasValue && t.UpdatedAt.Value >= weekStart);
-
-            var resolvedForAvg = await deptQuery
-                .Where(t => (t.TicketStatus.Name == "Resolved" || t.TicketStatus.Name == "Closed")
-                    && t.UpdatedAt.HasValue)
-                .Select(t => new { t.CreatedAt, UpdatedAt = (DateTime)t.UpdatedAt! })
-                .ToListAsync();
-
-            var avgResolutionHours = resolvedForAvg.Count > 0
-                ? Math.Round(resolvedForAvg.Average(t => (t.UpdatedAt - t.CreatedAt).TotalHours), 2)
+            var resolvedTimes = await _repo.GetResolvedTicketTimesAsync(deptId.Value);
+            var avgResolutionHours = resolvedTimes.Count > 0
+                ? Math.Round(resolvedTimes.Average(t => (t.UpdatedAt - t.CreatedAt).TotalHours), 2)
                 : 0;
 
-            var escalatedTickets = await deptQuery.CountAsync(t => t.IsEscalated);
+            var escalated = await _repo.CountDeptEscalatedTicketsAsync(deptId.Value);
 
-            var agentRoleId = await _context.Roles
-                .Where(r => r.Name == "Agent")
-                .Select(r => r.Id)
-                .FirstAsync();
-
-            var agents = await _context.Users
-                .Where(u => u.RoleId == agentRoleId && u.IsActive && u.DepartmentId == deptId.Value)
-                .ToListAsync();
-
-            var agentIds = agents.Select(a => a.Id).ToList();
-
-            var agentTickets = await _context.Tickets
-                .Where(t => t.AssignedToUserId.HasValue && agentIds.Contains(t.AssignedToUserId.Value))
-                .Select(t => new { t.AssignedToUserId, StatusName = t.TicketStatus.Name, t.IsEscalated, t.UpdatedAt })
-                .ToListAsync();
+            var agentRoleId = await _repo.GetAgentRoleIdAsync();
+            var agents      = await _repo.GetAgentsInDepartmentAsync(deptId.Value, agentRoleId);
+            var agentIds    = agents.Select(a => a.Id).ToList();
+            var agentData   = await _repo.GetAgentTicketDataAsync(agentIds);
 
             var agentPerformance = agents.Select(agent => new AgentPerformanceDto
             {
-                AgentName = agent.FirstName + " " + agent.LastName,
-                ResolvedTickets = agentTickets.Count(t =>
-                    t.AssignedToUserId == agent.Id
-                    && (t.StatusName == "Resolved" || t.StatusName == "Closed")),
-                OpenTickets = agentTickets.Count(t =>
-                    t.AssignedToUserId == agent.Id
-                    && (t.StatusName == "Open" || t.StatusName == "In Progress")),
-                EscalatedTickets = agentTickets.Count(t =>
-                    t.AssignedToUserId == agent.Id && t.IsEscalated)
+                AgentName       = agent.FirstName + " " + agent.LastName,
+                ResolvedTickets = agentData.Count(t => t.AgentId == agent.Id && t.StatusName == "Resolved"),
+                OpenTickets     = agentData.Count(t => t.AgentId == agent.Id && (t.StatusName == "Open" || t.StatusName == "In Progress")),
+                EscalatedTickets = agentData.Count(t => t.AgentId == agent.Id && t.IsEscalated)
             }).ToList();
 
             var agentAvailability = agents.Select(agent =>
             {
-                var openCount = agentTickets.Count(t =>
-                    t.AssignedToUserId == agent.Id
-                    && (t.StatusName == "Open" || t.StatusName == "In Progress"));
-                var resolvedCount = agentTickets.Count(t =>
-                    t.AssignedToUserId == agent.Id
-                    && (t.StatusName == "Resolved" || t.StatusName == "Closed")
-                    && t.UpdatedAt.HasValue && t.UpdatedAt.Value >= weekStart);
+                var openCount = agentData.Count(t =>
+                    t.AgentId == agent.Id && (t.StatusName == "Open" || t.StatusName == "In Progress"));
+                var resolvedCount = agentData.Count(t =>
+                    t.AgentId == agent.Id &&
+                    t.StatusName == "Resolved" &&
+                    t.UpdatedAt.HasValue && t.UpdatedAt.Value >= weekStart);
                 return new AgentAvailabilityDto
                 {
-                    UserId = agent.Id,
-                    AgentName = agent.FirstName + " " + agent.LastName,
-                    OpenTickets = openCount,
+                    UserId           = agent.Id,
+                    AgentName        = agent.FirstName + " " + agent.LastName,
+                    OpenTickets      = openCount,
                     ResolvedThisWeek = resolvedCount,
-                    IsAvailable = openCount < 5
+                    IsAvailable      = openCount < 5
                 };
             }).ToList();
 
-            var unassignedTicketsList = await deptQuery
-                .Include(t => t.Category)
-                .Include(t => t.Priority)
-                .Include(t => t.TicketStatus)
-                .Include(t => t.CreatedByUser)
-                .Where(t => t.AssignedToUserId == null)
-                .OrderByDescending(t => t.CreatedAt)
-                .Take(20)
-                .Select(t => new RecentTicketDto
-                {
-                    Id = t.Id,
-                    ReferenceNumber = t.ReferenceNumber,
-                    Title = t.Title,
-                    Category = t.Category.Name,
-                    Priority = t.Priority.Name,
-                    Status = t.TicketStatus.Name,
-                    CreatedBy = t.CreatedByUser.FirstName + " " + t.CreatedByUser.LastName,
-                    AssignedTo = null,
-                    IsEscalated = t.IsEscalated,
-                    CreatedAt = t.CreatedAt
-                })
-                .ToListAsync();
-
-            var recentTickets = await deptQuery
-                .Include(t => t.Category)
-                .Include(t => t.Priority)
-                .Include(t => t.TicketStatus)
-                .Include(t => t.CreatedByUser)
-                .Include(t => t.AssignedToUser)
-                .OrderByDescending(t => t.CreatedAt)
-                .Take(10)
-                .Select(t => new RecentTicketDto
-                {
-                    Id = t.Id,
-                    ReferenceNumber = t.ReferenceNumber,
-                    Title = t.Title,
-                    Category = t.Category.Name,
-                    Priority = t.Priority.Name,
-                    Status = t.TicketStatus.Name,
-                    CreatedBy = t.CreatedByUser.FirstName + " " + t.CreatedByUser.LastName,
-                    AssignedTo = t.AssignedToUser != null
-                        ? t.AssignedToUser.FirstName + " " + t.AssignedToUser.LastName
-                        : null,
-                    IsEscalated = t.IsEscalated,
-                    CreatedAt = t.CreatedAt
-                })
-                .ToListAsync();
-
-            var categoryBreakdown = await deptQuery
-                .GroupBy(t => t.Category.Name)
-                .Select(g => new CategoryBreakdownDto { Category = g.Key, Count = g.Count() })
-                .ToListAsync();
-
-            var priorityBreakdown = await deptQuery
-                .GroupBy(t => t.Priority.Name)
-                .Select(g => new PriorityBreakdownDto { Priority = g.Key, Count = g.Count() })
-                .ToListAsync();
+            var unassignedList  = await _repo.GetUnassignedTicketsInDeptAsync(deptId.Value, 20);
+            var recentTickets   = await _repo.GetRecentTicketsAsync(take: 10, deptId: deptId.Value);
+            var categoryBreakdown = await _repo.GetCategoryBreakdownAsync(deptId.Value);
+            var priorityBreakdown = await _repo.GetPriorityBreakdownAsync(deptId.Value);
 
             return new ManagerDashboardDto
             {
-                TeamOpenTickets = teamOpenTickets,
-                UnassignedTickets = unassignedTickets,
-                ResolvedThisWeek = resolvedThisWeek,
-                AvgResolutionHours = avgResolutionHours,
-                EscalatedTickets = escalatedTickets,
-                AgentPerformance = agentPerformance,
-                AgentAvailability = agentAvailability,
-                UnassignedTicketsList = unassignedTicketsList,
-                RecentTickets = recentTickets,
-                CategoryBreakdown = categoryBreakdown,
-                PriorityBreakdown = priorityBreakdown
+                TeamOpenTickets      = teamOpenTickets,
+                UnassignedTickets    = unassignedTickets,
+                ResolvedThisWeek     = resolvedThisWeek,
+                AvgResolutionHours   = avgResolutionHours,
+                EscalatedTickets     = escalated,
+                AgentPerformance     = agentPerformance,
+                AgentAvailability    = agentAvailability,
+                UnassignedTicketsList = unassignedList,
+                RecentTickets        = recentTickets,
+                CategoryBreakdown    = categoryBreakdown,
+                PriorityBreakdown    = priorityBreakdown
             };
         }
 
         public async Task<AgentDashboardDto> GetAgentDashboardAsync(int agentUserId)
         {
-            var today = DateTime.UtcNow.Date;
+            var today     = DateTime.UtcNow.Date;
             var weekStart = today.AddDays(-6);
 
-            var assignedToMe = await _context.Tickets
-                .CountAsync(t => t.AssignedToUserId == agentUserId
-                    && t.TicketStatus.Name != "Resolved"
-                    && t.TicketStatus.Name != "Closed");
-
-            var resolvedToday = await _context.Tickets
-                .CountAsync(t => t.AssignedToUserId == agentUserId
-                    && t.TicketStatus.Name == "Resolved"
-                    && t.UpdatedAt.HasValue && t.UpdatedAt.Value.Date == today);
-
-            var inProgress = await _context.Tickets
-                .CountAsync(t => t.AssignedToUserId == agentUserId
-                    && t.TicketStatus.Name == "In Progress");
-
-            var resolvedThisWeek = await _context.Tickets
-                .CountAsync(t => t.AssignedToUserId == agentUserId
-                    && t.TicketStatus.Name == "Resolved"
-                    && t.UpdatedAt.HasValue && t.UpdatedAt.Value >= weekStart);
-
-            var escalatedCount = await _context.Tickets
-                .CountAsync(t => t.AssignedToUserId == agentUserId && t.IsEscalated);
-
-            var myActiveTickets = await _context.Tickets
-                .Include(t => t.Category)
-                .Include(t => t.Priority)
-                .Include(t => t.TicketStatus)
-                .Include(t => t.CreatedByUser)
-                .Include(t => t.AssignedToUser)
-                .Where(t => t.AssignedToUserId == agentUserId)
-                .OrderByDescending(t => t.CreatedAt)
-                .Select(t => new RecentTicketDto
-                {
-                    Id = t.Id,
-                    ReferenceNumber = t.ReferenceNumber,
-                    Title = t.Title,
-                    Category = t.Category.Name,
-                    Priority = t.Priority.Name,
-                    Status = t.TicketStatus.Name,
-                    CreatedBy = t.CreatedByUser.FirstName + " " + t.CreatedByUser.LastName,
-                    AssignedTo = t.AssignedToUser != null
-                        ? t.AssignedToUser.FirstName + " " + t.AssignedToUser.LastName
-                        : null,
-                    IsEscalated = t.IsEscalated,
-                    CreatedAt = t.CreatedAt
-                })
-                .ToListAsync();
-
-            var recentActivity = await _context.ActivityLogs
-                .Include(a => a.User)
-                .Where(a => a.UserId == agentUserId)
-                .OrderByDescending(a => a.LoggedAt)
-                .Take(10)
-                .Select(a => new RecentActivityDto
-                {
-                    Action = a.Action,
-                    Details = a.Details ?? string.Empty,
-                    UserName = a.User.FirstName + " " + a.User.LastName,
-                    LoggedAt = a.LoggedAt
-                })
-                .ToListAsync();
+            var assignedToMe     = await _repo.CountAgentActiveTicketsAsync(agentUserId);
+            var resolvedToday    = await _repo.CountAgentTicketsResolvedTodayAsync(agentUserId);
+            var inProgress       = await _repo.CountAgentTicketsByStatusNameAsync(agentUserId, "In Progress");
+            var resolvedThisWeek = await _repo.CountAgentTicketsResolvedSinceAsync(agentUserId, weekStart);
+            var escalatedCount   = await _repo.CountAgentEscalatedTicketsAsync(agentUserId);
+            var myTickets        = await _repo.GetRecentTicketsAsync(assignedToUserId: agentUserId);
+            var recentActivity   = await _repo.GetRecentActivityAsync(userId: agentUserId, take: 10);
 
             return new AgentDashboardDto
             {
-                AssignedToMe = assignedToMe,
-                ResolvedToday = resolvedToday,
-                InProgress = inProgress,
+                AssignedToMe     = assignedToMe,
+                ResolvedToday    = resolvedToday,
+                InProgress       = inProgress,
                 ResolvedThisWeek = resolvedThisWeek,
-                EscalatedCount = escalatedCount,
-                MyTickets = myActiveTickets,
-                RecentActivity = recentActivity
+                EscalatedCount   = escalatedCount,
+                MyTickets        = myTickets,
+                RecentActivity   = recentActivity
             };
         }
 
         public async Task<EmployeeDashboardDto> GetEmployeeDashboardAsync(int employeeUserId)
         {
-            var myOpenTickets = await _context.Tickets
-                .CountAsync(t => t.CreatedByUserId == employeeUserId && t.TicketStatus.Name == "Open");
-
-            var myInProgressTickets = await _context.Tickets
-                .CountAsync(t => t.CreatedByUserId == employeeUserId && t.TicketStatus.Name == "In Progress");
-
-            var myResolvedTickets = await _context.Tickets
-                .CountAsync(t => t.CreatedByUserId == employeeUserId
-                    && (t.TicketStatus.Name == "Resolved" || t.TicketStatus.Name == "Closed"));
-
-            var myTotalTickets = await _context.Tickets
-                .CountAsync(t => t.CreatedByUserId == employeeUserId);
-
-            var myRecentTickets = await _context.Tickets
-                .Include(t => t.Category)
-                .Include(t => t.Priority)
-                .Include(t => t.TicketStatus)
-                .Include(t => t.CreatedByUser)
-                .Include(t => t.AssignedToUser)
-                .Where(t => t.CreatedByUserId == employeeUserId)
-                .OrderByDescending(t => t.CreatedAt)
-                .Take(10)
-                .Select(t => new RecentTicketDto
-                {
-                    Id = t.Id,
-                    ReferenceNumber = t.ReferenceNumber,
-                    Title = t.Title,
-                    Category = t.Category.Name,
-                    Priority = t.Priority.Name,
-                    Status = t.TicketStatus.Name,
-                    CreatedBy = t.CreatedByUser.FirstName + " " + t.CreatedByUser.LastName,
-                    AssignedTo = t.AssignedToUser != null
-                        ? t.AssignedToUser.FirstName + " " + t.AssignedToUser.LastName
-                        : null,
-                    IsEscalated = t.IsEscalated,
-                    CreatedAt = t.CreatedAt
-                })
-                .ToListAsync();
-
-            var myNotifications = await _context.Notifications
-                .Where(n => n.UserId == employeeUserId)
-                .OrderByDescending(n => n.CreatedAt)
-                .Select(n => new NotificationDto
-                {
-                    Id = n.Id,
-                    Message = n.Message,
-                    IsRead = n.IsRead,
-                    CreatedAt = n.CreatedAt
-                })
-                .ToListAsync();
+            var myOpenTickets       = await _repo.CountEmployeeTicketsByStatusNameAsync(employeeUserId, "Open");
+            var myInProgressTickets = await _repo.CountEmployeeTicketsByStatusNameAsync(employeeUserId, "In Progress");
+            var myResolvedTickets   = await _repo.CountEmployeeTicketsByStatusNameAsync(employeeUserId, "Resolved");
+            var myTotalTickets      = await _repo.CountAllEmployeeTicketsAsync(employeeUserId);
+            var myRecentTickets     = await _repo.GetRecentTicketsAsync(take: 10, createdByUserId: employeeUserId);
+            var myNotifications     = await _repo.GetUserNotificationsAsync(employeeUserId);
 
             return new EmployeeDashboardDto
             {
-                MyOpenTickets = myOpenTickets,
+                MyOpenTickets       = myOpenTickets,
                 MyInProgressTickets = myInProgressTickets,
-                MyResolvedTickets = myResolvedTickets,
-                MyTotalTickets = myTotalTickets,
-                MyRecentTickets = myRecentTickets,
-                MyNotifications = myNotifications
+                MyResolvedTickets   = myResolvedTickets,
+                MyTotalTickets      = myTotalTickets,
+                MyRecentTickets     = myRecentTickets,
+                MyNotifications     = myNotifications
             };
         }
     }
