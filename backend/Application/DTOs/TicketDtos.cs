@@ -71,6 +71,7 @@ namespace backend.Application.DTOs
         public int? DepartmentId { get; set; }
         public string? Department { get; set; }
         public bool IsEscalated { get; set; }
+        public int? EscalatedByUserId { get; set; }
         public string? EscalatedBy { get; set; }
         public DateTime? EscalatedAt { get; set; }
         public DateTime CreatedAt { get; set; }

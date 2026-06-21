@@ -98,24 +98,26 @@ namespace backend.Application.Services
                 };
             }).ToList();
 
-            var unassignedList  = await _repo.GetUnassignedTicketsInDeptAsync(deptId.Value, 20);
-            var recentTickets   = await _repo.GetRecentTicketsAsync(take: 10, deptId: deptId.Value);
+            var unassignedList    = await _repo.GetUnassignedTicketsInDeptAsync(deptId.Value, 20);
+            var escalatedList     = await _repo.GetEscalatedTicketsNeedingReassignmentAsync(deptId.Value, 20);
+            var recentTickets     = await _repo.GetRecentTicketsAsync(take: 10, deptId: deptId.Value);
             var categoryBreakdown = await _repo.GetCategoryBreakdownAsync(deptId.Value);
             var priorityBreakdown = await _repo.GetPriorityBreakdownAsync(deptId.Value);
 
             return new ManagerDashboardDto
             {
-                TeamOpenTickets      = teamOpenTickets,
-                UnassignedTickets    = unassignedTickets,
-                ResolvedThisWeek     = resolvedThisWeek,
-                AvgResolutionHours   = avgResolutionHours,
-                EscalatedTickets     = escalated,
-                AgentPerformance     = agentPerformance,
-                AgentAvailability    = agentAvailability,
+                TeamOpenTickets       = teamOpenTickets,
+                UnassignedTickets     = unassignedTickets,
+                ResolvedThisWeek      = resolvedThisWeek,
+                AvgResolutionHours    = avgResolutionHours,
+                EscalatedTickets      = escalated,
+                AgentPerformance      = agentPerformance,
+                AgentAvailability     = agentAvailability,
                 UnassignedTicketsList = unassignedList,
-                RecentTickets        = recentTickets,
-                CategoryBreakdown    = categoryBreakdown,
-                PriorityBreakdown    = priorityBreakdown
+                EscalatedTicketsList  = escalatedList,
+                RecentTickets         = recentTickets,
+                CategoryBreakdown     = categoryBreakdown,
+                PriorityBreakdown     = priorityBreakdown
             };
         }
 

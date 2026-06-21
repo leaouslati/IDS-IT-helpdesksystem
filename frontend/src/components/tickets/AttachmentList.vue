@@ -10,8 +10,10 @@
     <a
       v-for="att in attachments"
       :key="att.id"
-      :href="att.fileUrl"
+      :href="fileUrl(att)"
+      :download="att.fileName"
       target="_blank"
+      rel="noopener noreferrer"
       class="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-white/[0.06] bg-gray-50/50 dark:bg-white/[0.02] hover:bg-gray-100 dark:hover:bg-white/[0.05] transition-all group"
     >
       <!-- Icon -->
@@ -58,10 +60,17 @@ import {
   Download,
   FileCode,
 } from "lucide-vue-next";
+import { API_ORIGIN } from "../../api/axios";
 
 defineProps({
   attachments: { type: Array, default: () => [] },
 });
+
+function fileUrl(att) {
+  const path = att.filePath || att.fileUrl || "";
+  if (!path) return "#";
+  return path.startsWith("http") ? path : `${API_ORIGIN}${path}`;
+}
 
 function ext(fileName) {
   return (fileName || "").split(".").pop().toLowerCase();

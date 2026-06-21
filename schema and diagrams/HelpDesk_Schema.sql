@@ -181,8 +181,7 @@ INSERT INTO TicketStatus (StatusName, Description) VALUES
 ('Open',        'Ticket has been submitted'),
 ('In Progress', 'Ticket is being worked on'),
 ('Pending',     'Waiting for more information'),
-('Resolved',    'Issue has been resolved'),
-('Closed',      'Ticket has been closed');
+('Resolved',    'Issue has been resolved');
 
 
 -- ============================================================

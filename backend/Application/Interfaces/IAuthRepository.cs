@@ -4,6 +4,7 @@ namespace backend.Application.Interfaces
 {
     public interface IAuthRepository
     {
+        Task<User?> GetUserWithRoleByEmailAsync(string email);
         Task<User?> GetActiveUserWithRoleByEmailAsync(string email);
         Task<List<PasswordResetToken>> GetActiveTokensForUserAsync(int userId);
         void AddPasswordResetToken(PasswordResetToken token);

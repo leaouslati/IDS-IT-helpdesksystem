@@ -240,7 +240,10 @@ const processedTickets = computed(() =>
 
 function formatDate(dateStr) {
   if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString("en-US", {
+  const normalized = /[Zz]|[+-]\d{2}:\d{2}$/.test(dateStr)
+    ? dateStr
+    : dateStr + "Z";
+  return new Date(normalized).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",

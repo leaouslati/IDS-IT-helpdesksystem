@@ -36,6 +36,7 @@ builder.Services.AddScoped<ITicketHoursLogRepository, TicketHoursLogRepository>(
 builder.Services.AddScoped<IAuthRepository,           AuthRepository>();
 builder.Services.AddScoped<ILookupRepository,         LookupRepository>();
 builder.Services.AddScoped<IDashboardRepository,      DashboardRepository>();
+builder.Services.AddScoped<IAdminRepository,          AdminRepository>();
 
 // ── Service registrations ─────────────────────────────────────────────────────
 builder.Services.AddScoped<IAuthService,           AuthService>();
@@ -43,6 +44,7 @@ builder.Services.AddScoped<IDashboardService,      DashboardService>();
 builder.Services.AddScoped<ITicketService,         TicketService>();
 builder.Services.AddScoped<ILookupService,         LookupService>();
 builder.Services.AddScoped<ITicketHoursLogService, TicketHoursLogService>();
+builder.Services.AddScoped<IAdminService,          AdminService>();
 
 // ── JWT Authentication ────────────────────────────────────────────────────────
 var jwtKey      = builder.Configuration["Jwt:Key"]!;

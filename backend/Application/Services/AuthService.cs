@@ -25,9 +25,12 @@ namespace backend.Application.Services
 
         public async Task<AuthLoginResult> LoginAsync(LoginRequestDto request)
         {
-            var user = await _repo.GetActiveUserWithRoleByEmailAsync(request.Email);
+            var user = await _repo.GetUserWithRoleByEmailAsync(request.Email);
             if (user == null)
                 return new AuthLoginResult { ErrorCode = "INVALID_CREDENTIALS" };
+
+            if (!user.IsActive)
+                return new AuthLoginResult { ErrorCode = "ACCOUNT_DISABLED" };
 
             if (user.LockoutUntil.HasValue && user.LockoutUntil.Value > DateTime.UtcNow)
             {

@@ -462,16 +462,46 @@
                 </button>
               </div>
 
-              <div v-if="ticket.escalationReason">
-                <p
-                  class="text-[10px] font-semibold uppercase tracking-wider text-orange-400 mb-0.5"
+              <!-- Escalation history — Admin/Manager only -->
+              <template
+                v-if="ticket.isEscalated && ['Admin', 'Manager'].includes(role)"
+              >
+                <div
+                  v-if="ticket.escalatedBy"
+                  class="flex items-center justify-between gap-2"
                 >
-                  Escalation Reason
-                </p>
-                <p class="text-sm text-gray-600 dark:text-gray-400">
-                  {{ ticket.escalationReason }}
-                </p>
-              </div>
+                  <div>
+                    <p
+                      class="text-[10px] font-semibold uppercase tracking-wider text-orange-400 mb-0.5"
+                    >
+                      Escalated By
+                    </p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                      {{ ticket.escalatedBy }}
+                    </p>
+                  </div>
+                  <div v-if="ticket.escalatedAt" class="text-right">
+                    <p
+                      class="text-[10px] font-semibold uppercase tracking-wider text-orange-400 mb-0.5"
+                    >
+                      At
+                    </p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                      {{ formatDate(ticket.escalatedAt) }}
+                    </p>
+                  </div>
+                </div>
+                <div v-if="ticket.escalationReason">
+                  <p
+                    class="text-[10px] font-semibold uppercase tracking-wider text-orange-400 mb-0.5"
+                  >
+                    Escalation Reason
+                  </p>
+                  <p class="text-sm text-gray-600 dark:text-gray-400">
+                    {{ ticket.escalationReason }}
+                  </p>
+                </div>
+              </template>
             </div>
           </div>
 
@@ -838,7 +868,9 @@ import {
   FileText,
   Bell,
   User,
+  Users,
   BarChart2,
+  Settings,
   X,
   Clock,
   Flame,
@@ -919,7 +951,10 @@ const navLinks = computed(() => {
   const map = {
     Admin: [
       { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard/admin" },
-      { icon: FileText, label: "Tickets", to: "/tickets" },
+      { icon: FileText, label: "All Tickets", to: "/tickets" },
+      { icon: Users, label: "Users", to: "/admin/users" },
+      { icon: BarChart2, label: "Reports", to: "/reports" },
+      { icon: Settings, label: "Settings", to: "/settings" },
       { icon: User, label: "Profile", to: "/profile" },
     ],
     Manager: [
@@ -1034,7 +1069,10 @@ async function openAssignModal() {
     agentsError.value = "";
     try {
       const res = await ticketApi.getAgentsAvailability(ticketId.value);
-      agents.value = res.data;
+      const escalatedById = ticket.value?.escalatedByUserId;
+      agents.value = escalatedById
+        ? res.data.filter((a) => a.userId !== escalatedById)
+        : res.data;
     } catch {
       agentsError.value = "Failed to load agents. Please try again.";
     } finally {
@@ -1119,12 +1157,22 @@ async function doEscalate() {
   escalating.value = true;
   try {
     await ticketApi.escalateTicket(ticketId.value, escalateReason.value);
-    toastStore.show("Ticket escalated successfully");
+    toastStore.show(
+      "Ticket escalated — it has been removed from your queue and the manager has been notified.",
+      "success"
+    );
     showEscalateModal.value = false;
     escalateReason.value = "";
-    await loadTicket();
-  } catch {
-    toastStore.show("Failed to escalate ticket", "error");
+    // Agent no longer has access after escalation (AssignedToUserId cleared); redirect to their list
+    if (role.value === "Agent") {
+      router.push("/tickets");
+    } else {
+      await loadTicket();
+    }
+  } catch (e) {
+    escalateError.value =
+      e.response?.data?.message || "Failed to escalate ticket.";
+    toastStore.show(escalateError.value, "error");
   } finally {
     escalating.value = false;
   }
@@ -1158,7 +1206,10 @@ function copyRef() {
 
 function formatDate(dateStr) {
   if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString("en-US", {
+  const normalized = /[Zz]|[+-]\d{2}:\d{2}$/.test(dateStr)
+    ? dateStr
+    : dateStr + "Z";
+  return new Date(normalized).toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",
     year: "numeric",
