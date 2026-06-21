@@ -26,18 +26,25 @@ namespace backend.Presentation.Controllers
             if (result.Success)
                 return Ok(result.Response);
 
+            if (result.ErrorCode == "ACCOUNT_DISABLED")
+                return StatusCode(403, new
+                {
+                    error   = "ACCOUNT_DISABLED",
+                    message = "Your account has been deactivated. Please contact your administrator."
+                });
+
             if (result.ErrorCode == "ACCOUNT_LOCKED")
                 return StatusCode(423, new
                 {
-                    error = "ACCOUNT_LOCKED",
-                    message = $"Account locked. Try again in {result.MinutesRemaining} minute(s).",
+                    error            = "ACCOUNT_LOCKED",
+                    message          = $"Account locked. Try again in {result.MinutesRemaining} minute(s).",
                     minutesRemaining = result.MinutesRemaining
                 });
 
             return Unauthorized(new
             {
-                error = "INVALID_CREDENTIALS",
-                message = "Invalid email or password.",
+                error             = "INVALID_CREDENTIALS",
+                message           = "Invalid email or password.",
                 attemptsRemaining = result.AttemptsRemaining
             });
         }

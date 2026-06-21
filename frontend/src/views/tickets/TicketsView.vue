@@ -331,8 +331,8 @@ const navLinks = computed(() => {
   const map = {
     Admin: [
       { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard/admin" },
-      { icon: FileText, label: "Tickets", to: "/tickets" },
-      { icon: Users, label: "Users", to: "/users" },
+      { icon: FileText, label: "All Tickets", to: "/tickets" },
+      { icon: Users, label: "Users", to: "/admin/users" },
       { icon: BarChart2, label: "Reports", to: "/reports" },
       { icon: Settings, label: "Settings", to: "/settings" },
       { icon: User, label: "Profile", to: "/profile" },

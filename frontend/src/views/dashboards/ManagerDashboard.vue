@@ -85,7 +85,7 @@
         />
         <StatCard
           title="Avg Resolution Time"
-          :value="`${(data?.avgResolutionHours ?? 0).toFixed(1)}h`"
+          :value="formatResolutionTime(data?.avgResolutionHours)"
           color="#14B8A6"
           :icon="Clock"
         />
@@ -190,6 +190,98 @@
                   class="text-center py-12 text-gray-400 dark:text-gray-500 text-sm"
                 >
                   No unassigned tickets — all clear!
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Escalated Tickets — Needs Reassignment -->
+      <div
+        v-if="(data?.escalatedTicketsList?.length ?? 0) > 0"
+        class="bg-white dark:bg-[#1A1D2E] rounded-xl shadow-sm border border-orange-200 dark:border-orange-900/40 overflow-hidden mb-6"
+      >
+        <div
+          class="flex items-center justify-between px-5 py-4 border-b border-orange-100 dark:border-orange-900/30 bg-orange-50/60 dark:bg-orange-900/10"
+        >
+          <div class="flex items-center gap-3">
+            <div
+              class="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center"
+            >
+              <Flame :size="15" class="text-orange-500" />
+            </div>
+            <div>
+              <h3 class="font-semibold text-[#0F172A] dark:text-white text-sm">
+                Escalated — Needs Reassignment
+              </h3>
+              <p class="text-xs text-orange-500 dark:text-orange-400 mt-0.5">
+                {{ data.escalatedTicketsList.length }} ticket{{
+                  data.escalatedTicketsList.length !== 1 ? "s" : ""
+                }}
+                escalated and awaiting a new agent
+              </p>
+            </div>
+          </div>
+          <button
+            @click="router.push('/tickets?filter=escalated')"
+            class="text-xs font-semibold text-orange-500 hover:text-orange-600 dark:text-orange-400 transition-colors"
+          >
+            View all →
+          </button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-gray-50 dark:bg-white/[0.03]">
+                <th
+                  v-for="col in escalatedColumns"
+                  :key="col.key"
+                  class="text-left px-5 py-3 text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider whitespace-nowrap"
+                >
+                  {{ col.label }}
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-white/[0.04]">
+              <tr
+                v-for="ticket in data.escalatedTicketsList"
+                :key="ticket.id"
+                class="hover:bg-orange-50/40 dark:hover:bg-orange-900/5 transition-colors cursor-pointer"
+                @click="router.push(`/tickets/${ticket.id}`)"
+              >
+                <td
+                  class="px-5 py-3.5 whitespace-nowrap text-[13px] font-mono text-gray-500 dark:text-gray-400"
+                >
+                  {{ ticket.referenceNumber }}
+                </td>
+                <td
+                  class="px-5 py-3.5 text-[13px] text-[#0F172A] dark:text-gray-300 max-w-[220px] truncate"
+                >
+                  {{ ticket.title }}
+                </td>
+                <td class="px-5 py-3.5 whitespace-nowrap">
+                  <span :class="priorityClass(ticket.priority)">{{
+                    ticket.priority
+                  }}</span>
+                </td>
+                <td
+                  class="px-5 py-3.5 whitespace-nowrap text-[13px] text-gray-500 dark:text-gray-400"
+                >
+                  {{ ticket.createdBy }}
+                </td>
+                <td
+                  class="px-5 py-3.5 whitespace-nowrap text-[13px] text-gray-500 dark:text-gray-400"
+                >
+                  {{ formatDate(ticket.createdAt) }}
+                </td>
+                <td class="px-5 py-3.5 whitespace-nowrap">
+                  <button
+                    @click.stop="router.push(`/tickets/${ticket.id}`)"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-orange-500 text-white hover:bg-orange-600 transition-colors"
+                  >
+                    Reassign
+                  </button>
                 </td>
               </tr>
             </tbody>
@@ -332,6 +424,7 @@ import {
   AlertCircle,
   Download,
   Plus,
+  Flame,
 } from "lucide-vue-next";
 import AppLayout from "../../components/layout/AppLayout.vue";
 import StatCard from "../../components/dashboard/StatCard.vue";
@@ -377,6 +470,15 @@ const unassignedColumns = [
   { key: "priority", label: "Priority" },
   { key: "createdBy", label: "Submitted By" },
   { key: "createdAt", label: "Date" },
+  { key: "action", label: "Action" },
+];
+
+const escalatedColumns = [
+  { key: "referenceNumber", label: "Ref#" },
+  { key: "title", label: "Title" },
+  { key: "priority", label: "Priority" },
+  { key: "createdBy", label: "Submitted By" },
+  { key: "createdAt", label: "Escalated" },
   { key: "action", label: "Action" },
 ];
 
@@ -480,9 +582,17 @@ function priorityClass(priority) {
   return `${base} ${map[priority] || map["Low"]}`;
 }
 
+function formatResolutionTime(hours) {
+  if (!hours || hours === 0) return "—";
+  return `${hours.toFixed(1)}h`;
+}
+
 function formatDate(dateStr) {
   if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString("en-US", {
+  const normalized = /[Zz]|[+-]\d{2}:\d{2}$/.test(dateStr)
+    ? dateStr
+    : dateStr + "Z";
+  return new Date(normalized).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",

@@ -109,6 +109,7 @@ import {
   XCircle,
   Paperclip,
   Pencil,
+  Clock,
   Activity,
 } from "lucide-vue-next";
 
@@ -194,6 +195,13 @@ function describe(entry) {
       const m = (entry.details || "").match(/File '(.+?)' uploaded/);
       return m ? `${u} uploaded "${m[1]}"` : `${u} uploaded a file`;
     }
+    case "Hours Logged": {
+      const m = (entry.details || "").match(/logged ([\d.]+)h/);
+      const hrs = m ? parseFloat(m[1]) : null;
+      return hrs !== null
+        ? `Hours logged: ${hrs % 1 === 0 ? hrs : hrs.toFixed(2)} hrs`
+        : `${u} logged hours`;
+    }
     case "Ticket Escalated":
       return `${u} escalated the ticket`;
     case "Ticket Deleted":
@@ -253,6 +261,12 @@ function entryStyle(entry) {
       fg: "text-indigo-600 dark:text-indigo-400",
       chip: "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400",
     };
+  if (a.includes("hours"))
+    return {
+      bg: "bg-cyan-100 dark:bg-cyan-900/30",
+      fg: "text-cyan-600 dark:text-cyan-400",
+      chip: "bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400",
+    };
   if (a.includes("updat"))
     return {
       bg: "bg-gray-100 dark:bg-white/10",
@@ -276,6 +290,7 @@ function entryIcon(entry) {
   if (a.includes("comment")) return MessageSquare;
   if (a.includes("status")) return RefreshCw;
   if (a.includes("upload") || a.includes("attach")) return Paperclip;
+  if (a.includes("hours")) return Clock;
   if (a.includes("updat")) return Pencil;
   return Activity;
 }

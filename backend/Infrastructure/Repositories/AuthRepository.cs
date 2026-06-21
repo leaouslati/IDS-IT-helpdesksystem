@@ -14,6 +14,11 @@ namespace backend.Infrastructure.Repositories
             _context = context;
         }
 
+        public async Task<User?> GetUserWithRoleByEmailAsync(string email) =>
+            await _context.Users
+                .Include(u => u.Role)
+                .FirstOrDefaultAsync(u => u.Email == email);
+
         public async Task<User?> GetActiveUserWithRoleByEmailAsync(string email) =>
             await _context.Users
                 .Include(u => u.Role)

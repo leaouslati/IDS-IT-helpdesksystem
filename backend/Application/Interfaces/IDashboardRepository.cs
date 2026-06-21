@@ -32,12 +32,14 @@ namespace backend.Application.Interfaces
         Task<List<User>> GetAgentsInDepartmentAsync(int deptId, int agentRoleId);
         Task<List<AgentTicketData>> GetAgentTicketDataAsync(List<int> agentIds);
         Task<List<RecentTicketDto>> GetUnassignedTicketsInDeptAsync(int deptId, int take = 20);
+        Task<List<RecentTicketDto>> GetEscalatedTicketsNeedingReassignmentAsync(int deptId, int take = 20);
 
         // ── Agent ─────────────────────────────────────────────────────────────
         Task<int> CountAgentActiveTicketsAsync(int agentId);
         Task<int> CountAgentTicketsByStatusNameAsync(int agentId, string statusName);
         Task<int> CountAgentTicketsResolvedTodayAsync(int agentId);
         Task<int> CountAgentTicketsResolvedSinceAsync(int agentId, DateTime since);
+        // Counts tickets escalated BY this agent (EscalatedByUserId) — not assigned to them
         Task<int> CountAgentEscalatedTicketsAsync(int agentId);
 
         // ── Employee ──────────────────────────────────────────────────────────

@@ -272,8 +272,8 @@ ChartJS.register(
 
 const navLinks = [
   { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard/admin" },
-  { icon: FileText, label: "Tickets", to: "/tickets" },
-  { icon: Users, label: "Users", to: "/users" },
+  { icon: FileText, label: "All Tickets", to: "/tickets" },
+  { icon: Users, label: "Users", to: "/admin/users" },
   { icon: BarChart2, label: "Reports", to: "/reports" },
   { icon: Settings, label: "Settings", to: "/settings" },
   { icon: User, label: "Profile", to: "/profile" },
@@ -518,22 +518,24 @@ function activityIcon(action) {
   return Activity;
 }
 
+function normalizeUtc(dateStr) {
+  return /[Zz]|[+-]\d{2}:\d{2}$/.test(dateStr) ? dateStr : dateStr + "Z";
+}
+
 function timeAgo(dateStr) {
   if (!dateStr) return "";
-  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  const d = new Date(normalizeUtc(dateStr));
+  const diff = Math.floor((Date.now() - d.getTime()) / 1000);
   if (diff < 60) return "Just now";
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   if (diff < 86400 * 7) return `${Math.floor(diff / 86400)}d ago`;
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 function formatDate(dateStr) {
   if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString("en-US", {
+  return new Date(normalizeUtc(dateStr)).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",

@@ -152,7 +152,11 @@ async function handleLogin() {
     const status = error.response?.status;
     const data = error.response?.data;
 
-    if (status === 423) {
+    if (status === 403 && data?.error === "ACCOUNT_DISABLED") {
+      isLocked.value = false;
+      errorMessage.value = data.message;
+      attemptsRemaining.value = null;
+    } else if (status === 423) {
       isLocked.value = true;
       errorMessage.value = "";
       attemptsRemaining.value = null;

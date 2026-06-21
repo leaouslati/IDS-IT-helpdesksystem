@@ -221,6 +221,33 @@ namespace backend.Infrastructure.Repositories
                 })
                 .ToListAsync();
 
+        public async Task<List<RecentTicketDto>> GetEscalatedTicketsNeedingReassignmentAsync(int deptId, int take = 20) =>
+            await _context.Tickets
+                .Include(t => t.Category)
+                .Include(t => t.Priority)
+                .Include(t => t.TicketStatus)
+                .Include(t => t.CreatedByUser)
+                .Where(t =>
+                    t.DepartmentId == deptId &&
+                    t.IsEscalated  == true   &&
+                    t.AssignedToUserId == null)
+                .OrderByDescending(t => t.EscalatedAt)
+                .Take(take)
+                .Select(t => new RecentTicketDto
+                {
+                    Id              = t.Id,
+                    ReferenceNumber = t.ReferenceNumber,
+                    Title           = t.Title,
+                    Category        = t.Category.Name,
+                    Priority        = t.Priority.Name,
+                    Status          = t.TicketStatus.Name,
+                    CreatedBy       = t.CreatedByUser.FirstName + " " + t.CreatedByUser.LastName,
+                    AssignedTo      = null,
+                    IsEscalated     = true,
+                    CreatedAt       = t.CreatedAt
+                })
+                .ToListAsync();
+
         // ── Agent ─────────────────────────────────────────────────────────────
 
         public async Task<int> CountAgentActiveTicketsAsync(int agentId) =>
@@ -247,9 +274,9 @@ namespace backend.Infrastructure.Repositories
                 t.TicketStatus.Name == "Resolved" &&
                 t.UpdatedAt.HasValue && t.UpdatedAt.Value >= since);
 
+        // Uses EscalatedByUserId so the count persists after AssignedToUserId is cleared on escalation
         public async Task<int> CountAgentEscalatedTicketsAsync(int agentId) =>
-            await _context.Tickets.CountAsync(t =>
-                t.AssignedToUserId == agentId && t.IsEscalated);
+            await _context.Tickets.CountAsync(t => t.EscalatedByUserId == agentId);
 
         // ── Employee ──────────────────────────────────────────────────────────
 

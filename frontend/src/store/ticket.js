@@ -78,9 +78,15 @@ export const useTicketStore = defineStore("ticket", {
           lookupApi.getPriorities(),
           lookupApi.getStatuses(),
         ]);
-        this.categories = cats.data ?? [];
+        const rawCats = cats.data ?? [];
+        this.categories = rawCats.sort((a, b) => {
+          if (a.name === "Other") return 1;
+          if (b.name === "Other") return -1;
+          return 0;
+        });
         this.priorities = pris.data ?? [];
-        this.statuses = stats.data?.length ? stats.data : STATIC_STATUSES;
+        const rawStatuses = stats.data?.length ? stats.data : STATIC_STATUSES;
+        this.statuses = rawStatuses.filter((s) => s.name !== "Closed");
       } catch {
         this.statuses = STATIC_STATUSES;
       }

@@ -99,6 +99,16 @@ namespace backend.Application.Services
                     .FirstOrDefault()
                 : null;
 
+            // Strip HTML tags from the escalation reason (comment body is stored as HTML)
+            if (escalationReason != null)
+                escalationReason = System.Text.RegularExpressions.Regex
+                    .Replace(escalationReason, "<.*?>", string.Empty)
+                    .Replace("&nbsp;", " ")
+                    .Trim();
+
+            // Escalation history (who escalated, when, why) is restricted to Admin/Manager only
+            bool canSeeEscalationHistory = role is "Admin" or "Manager";
+
             return new TicketDetailDto
             {
                 Id               = ticket.Id,
@@ -120,10 +130,11 @@ namespace backend.Application.Services
                 DepartmentId     = ticket.DepartmentId,
                 Department       = ticket.Department?.Name,
                 IsEscalated      = ticket.IsEscalated,
-                EscalatedBy      = ticket.EscalatedByUser != null
+                EscalatedByUserId = canSeeEscalationHistory ? ticket.EscalatedByUserId : null,
+                EscalatedBy      = canSeeEscalationHistory && ticket.EscalatedByUser != null
                     ? ticket.EscalatedByUser.FirstName + " " + ticket.EscalatedByUser.LastName
                     : null,
-                EscalatedAt      = ticket.EscalatedAt,
+                EscalatedAt      = canSeeEscalationHistory ? ticket.EscalatedAt : null,
                 CreatedAt        = ticket.CreatedAt,
                 UpdatedAt        = ticket.UpdatedAt,
                 CanEdit          = canEdit,
@@ -132,7 +143,7 @@ namespace backend.Application.Services
                 CanUpdateStatus  = canUpdateStatus,
                 CanEscalate      = canEscalate,
                 CanLogHours      = canLogHours,
-                EscalationReason = escalationReason,
+                EscalationReason = canSeeEscalationHistory ? escalationReason : null,
                 TotalHoursWorked = totalHours,
                 Comments         = _mapper.Map<List<TicketCommentDto>>(comments),
                 Attachments      = _mapper.Map<List<TicketAttachmentDto>>(attachments),
@@ -421,6 +432,8 @@ namespace backend.Application.Services
             ticket.EscalatedByUserId = userId;
             ticket.EscalatedAt       = DateTime.UtcNow;
             ticket.UpdatedAt         = DateTime.UtcNow;
+            // Clear assignee so the ticket leaves the agent's queue and the manager must reassign
+            ticket.AssignedToUserId  = null;
 
             _repo.AddComment(new TicketComment
             {

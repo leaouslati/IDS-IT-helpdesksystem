@@ -25,6 +25,6 @@ A modern web-based IT Help Desk and Ticketing Management System built as part of
 1. Employee creates a ticket — it goes to their department manager, unassigned
 2. Manager reviews unassigned tickets and assigns one to an available agent
 3. Agent sees the ticket as Open and clicks **Start** to begin working (status → In Progress)
-4. Agent updates the status as work progresses: Pending, Resolved, or Closed
-5. Employee gets notified when their ticket is Resolved or Closed
-6. No manager approval is needed to close a ticket — the agent closes it directly
+4. Agent updates the status as work progresses: Pending or Resolved
+5. Employee gets notified when their ticket is Resolved
+6. No manager approval is needed to resolve a ticket — the agent resolves it directly
