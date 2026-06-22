@@ -2,30 +2,51 @@ using AutoMapper;
 using backend.Application.DTOs;
 using backend.Application.Interfaces;
 using backend.Domain.Entities;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 
 namespace backend.Application.Services
 {
     public class TicketService : ITicketService
     {
-        private readonly ITicketRepository _repo;
-        private readonly IWebHostEnvironment _env;
-        private readonly IMapper _mapper;
+        private readonly ITicketRepository      _repo;
+        private readonly IFileStorageService    _fileStorage;
+        private readonly INotificationService   _notifications;
+        private readonly IMapper                _mapper;
+        private readonly int                    _maxFileSizeBytes;
 
+        // ── Allowed extensions (server-side allow-list) ───────────────────────
         private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
-            ".jpg", ".jpeg", ".png", ".gif",
-            ".pdf", ".doc", ".docx", ".xls", ".xlsx",
-            ".zip", ".txt", ".log"
+            // Images
+            ".png", ".jpg", ".jpeg", ".gif", ".webp",
+            // Documents
+            ".pdf", ".docx", ".doc", ".xlsx", ".xls", ".pptx", ".ppt", ".txt", ".csv",
+            // Logs
+            ".log"
         };
-        private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
 
-        public TicketService(ITicketRepository repo, IWebHostEnvironment env, IMapper mapper)
+        // ── Explicitly blocked extensions ─────────────────────────────────────
+        private static readonly HashSet<string> BlockedExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
-            _repo   = repo;
-            _env    = env;
-            _mapper = mapper;
+            ".exe", ".php", ".sh", ".bat", ".cmd", ".js", ".vbs", ".ps1",
+            ".dll", ".msi", ".jar", ".py", ".asp", ".aspx", ".jsp"
+        };
+
+        public TicketService(
+            ITicketRepository repo,
+            IFileStorageService fileStorage,
+            INotificationService notifications,
+            IMapper mapper,
+            IConfiguration config)
+        {
+            _repo          = repo;
+            _fileStorage   = fileStorage;
+            _notifications = notifications;
+            _mapper        = mapper;
+            // Read from config; default 10 MB
+            var maxMb         = config.GetValue<int>("FileUpload:MaxSizeMB", 10);
+            _maxFileSizeBytes = maxMb * 1024 * 1024;
         }
 
         // ── LIST ─────────────────────────────────────────────────────────────
@@ -99,14 +120,12 @@ namespace backend.Application.Services
                     .FirstOrDefault()
                 : null;
 
-            // Strip HTML tags from the escalation reason (comment body is stored as HTML)
             if (escalationReason != null)
                 escalationReason = System.Text.RegularExpressions.Regex
                     .Replace(escalationReason, "<.*?>", string.Empty)
                     .Replace("&nbsp;", " ")
                     .Trim();
 
-            // Escalation history (who escalated, when, why) is restricted to Admin/Manager only
             bool canSeeEscalationHistory = role is "Admin" or "Manager";
 
             return new TicketDetailDto
@@ -189,18 +208,6 @@ namespace backend.Application.Services
 
             ticket.ReferenceNumber = $"TKT-{ticket.Id:D3}";
 
-            var dept = await _repo.FindDepartmentAsync(user.DepartmentId.Value);
-            if (dept?.ManagerId != null)
-            {
-                _repo.AddNotification(new Notification
-                {
-                    UserId    = dept.ManagerId.Value,
-                    Message   = $"New ticket {ticket.ReferenceNumber} submitted in your department: {ticket.Title}",
-                    IsRead    = false,
-                    CreatedAt = DateTime.UtcNow
-                });
-            }
-
             _repo.AddActivityLog(new ActivityLog
             {
                 UserId   = userId,
@@ -211,6 +218,20 @@ namespace backend.Application.Services
             });
 
             await _repo.SaveChangesAsync();
+
+            // Notify department manager (bell + email)
+            var dept = await _repo.FindDepartmentAsync(user.DepartmentId.Value);
+            if (dept?.ManagerId != null)
+            {
+                await _notifications.NotifyAsync(
+                    type:           NotificationType.TicketCreated,
+                    ticketId:       ticket.Id,
+                    ticketRef:      ticket.ReferenceNumber,
+                    ticketTitle:    ticket.Title,
+                    recipientUserIds: new[] { dept.ManagerId.Value },
+                    message:        $"New ticket {ticket.ReferenceNumber} submitted in your department: \"{ticket.Title}\". Please assign it to an agent.",
+                    sendEmail:      true);
+            }
 
             var result = await GetTicketByIdAsync(ticket.Id, userId, "Employee");
             return (result, null);
@@ -233,7 +254,6 @@ namespace backend.Application.Services
             if (!await _repo.PriorityExistsAsync(dto.PriorityId))
                 return (false, "Invalid priority.");
 
-            // Record what changed for the activity log
             var changes = new List<string>();
             if (ticket.Title != dto.Title.Trim()) changes.Add("title");
             if (ticket.Description != dto.Description.Trim()) changes.Add("description");
@@ -281,8 +301,12 @@ namespace backend.Application.Services
 
             var refNum = ticket.ReferenceNumber;
 
-            var comments    = await _repo.GetCommentsForDeleteAsync(ticketId);
             var attachments = await _repo.GetAttachmentsForDeleteAsync(ticketId);
+            // Delete physical files before removing DB records
+            foreach (var a in attachments)
+                _fileStorage.DeleteFile(a.StoredFileName, a.TicketId);
+
+            var comments = await _repo.GetCommentsForDeleteAsync(ticketId);
             _repo.RemoveComments(comments);
             _repo.RemoveAttachments(attachments);
             _repo.RemoveTicket(ticket);
@@ -332,14 +356,6 @@ namespace backend.Application.Services
             ticket.AssignedToUserId = dto.AgentUserId;
             ticket.UpdatedAt        = DateTime.UtcNow;
 
-            _repo.AddNotification(new Notification
-            {
-                UserId    = dto.AgentUserId,
-                Message   = $"Ticket {ticket.ReferenceNumber} has been assigned to you: {ticket.Title}",
-                IsRead    = false,
-                CreatedAt = DateTime.UtcNow
-            });
-
             _repo.AddActivityLog(new ActivityLog
             {
                 UserId    = managerId,
@@ -352,6 +368,17 @@ namespace backend.Application.Services
             });
 
             await _repo.SaveChangesAsync();
+
+            // Notify the assigned agent (bell + email)
+            await _notifications.NotifyAsync(
+                type:           NotificationType.TicketAssigned,
+                ticketId:       ticketId,
+                ticketRef:      ticket.ReferenceNumber,
+                ticketTitle:    ticket.Title,
+                recipientUserIds: new[] { dto.AgentUserId },
+                message:        $"Ticket {ticket.ReferenceNumber} \"{ticket.Title}\" has been assigned to you.",
+                sendEmail:      true);
+
             return (true, null);
         }
 
@@ -378,17 +405,6 @@ namespace backend.Application.Services
             ticket.TicketStatusId = newStatus.Id;
             ticket.UpdatedAt      = DateTime.UtcNow;
 
-            if (dto.StatusName == "Resolved")
-            {
-                _repo.AddNotification(new Notification
-                {
-                    UserId    = ticket.CreatedByUserId,
-                    Message   = $"Your ticket {ticket.ReferenceNumber} has been resolved.",
-                    IsRead    = false,
-                    CreatedAt = DateTime.UtcNow
-                });
-            }
-
             _repo.AddActivityLog(new ActivityLog
             {
                 UserId    = agentId,
@@ -401,6 +417,20 @@ namespace backend.Application.Services
             });
 
             await _repo.SaveChangesAsync();
+
+            // Notify ticket creator when resolved (bell + email — prompts follow-up with client)
+            if (dto.StatusName == "Resolved")
+            {
+                await _notifications.NotifyAsync(
+                    type:           NotificationType.TicketClosed,
+                    ticketId:       ticketId,
+                    ticketRef:      ticket.ReferenceNumber,
+                    ticketTitle:    ticket.Title,
+                    recipientUserIds: new[] { ticket.CreatedByUserId },
+                    message:        $"Your ticket {ticket.ReferenceNumber} \"{ticket.Title}\" has been resolved. Please follow up with the client to confirm.",
+                    sendEmail:      true);
+            }
+
             return (true, null);
         }
 
@@ -444,21 +474,6 @@ namespace backend.Application.Services
                 CreatedAt           = DateTime.UtcNow
             });
 
-            if (role == "Agent" && ticket.DepartmentId.HasValue)
-            {
-                var deptManagerId = await _repo.GetDepartmentManagerIdAsync(ticket.DepartmentId.Value);
-                if (deptManagerId.HasValue)
-                {
-                    _repo.AddNotification(new Notification
-                    {
-                        UserId    = deptManagerId.Value,
-                        Message   = $"Ticket {ticket.ReferenceNumber} has been escalated: {dto.Reason}",
-                        IsRead    = false,
-                        CreatedAt = DateTime.UtcNow
-                    });
-                }
-            }
-
             var escalator = await _repo.FindUserAsync(userId);
             _repo.AddActivityLog(new ActivityLog
             {
@@ -470,6 +485,24 @@ namespace backend.Application.Services
             });
 
             await _repo.SaveChangesAsync();
+
+            // Notify department manager(s) to reassign (bell + email)
+            if (ticket.DepartmentId.HasValue)
+            {
+                var deptManagerId = await _repo.GetDepartmentManagerIdAsync(ticket.DepartmentId.Value);
+                if (deptManagerId.HasValue)
+                {
+                    await _notifications.NotifyAsync(
+                        type:           NotificationType.TicketEscalated,
+                        ticketId:       ticketId,
+                        ticketRef:      ticket.ReferenceNumber,
+                        ticketTitle:    ticket.Title,
+                        recipientUserIds: new[] { deptManagerId.Value },
+                        message:        $"Ticket {ticket.ReferenceNumber} \"{ticket.Title}\" has been escalated and needs reassignment.",
+                        sendEmail:      true);
+                }
+            }
+
             return (true, null);
         }
 
@@ -509,17 +542,6 @@ namespace backend.Application.Services
 
             _repo.AddComment(comment);
 
-            if (ticket.CreatedByUserId != userId)
-            {
-                _repo.AddNotification(new Notification
-                {
-                    UserId    = ticket.CreatedByUserId,
-                    Message   = $"New comment added to your ticket {ticket.ReferenceNumber}.",
-                    IsRead    = false,
-                    CreatedAt = DateTime.UtcNow
-                });
-            }
-
             _repo.AddActivityLog(new ActivityLog
             {
                 UserId   = userId,
@@ -531,6 +553,20 @@ namespace backend.Application.Services
 
             await _repo.SaveChangesAsync();
 
+            // Notify all ticket participants except the commenter (bell only)
+            var participants = await _repo.GetTicketParticipantIdsAsync(ticketId, userId);
+            if (participants.Count > 0)
+            {
+                await _notifications.NotifyAsync(
+                    type:           NotificationType.CommentAdded,
+                    ticketId:       ticketId,
+                    ticketRef:      ticket.ReferenceNumber,
+                    ticketTitle:    ticket.Title,
+                    recipientUserIds: participants,
+                    message:        $"A new comment was added to ticket {ticket.ReferenceNumber} \"{ticket.Title}\".",
+                    sendEmail:      false);
+            }
+
             var user = await _repo.GetUserWithRoleAsync(userId);
             return (new TicketCommentDto
             {
@@ -540,6 +576,7 @@ namespace backend.Application.Services
                 UserRole            = user?.Role?.Name ?? string.Empty,
                 Content             = comment.Content,
                 IsEscalationComment = comment.IsEscalationComment,
+                IsAttachmentOnly    = false,
                 IsInternal          = false,
                 CreatedAt           = comment.CreatedAt
             }, null);
@@ -568,6 +605,10 @@ namespace backend.Application.Services
         }
 
         // ── UPLOAD ATTACHMENT ─────────────────────────────────────────────────
+        // Design: POST /api/ticket/{id}/attachments (file only, no comment required).
+        // A system-style timeline comment is auto-created so the upload appears in the
+        // chronological feed alongside regular comments. CommentId links the attachment to it.
+        // For a "comment + file" workflow, the frontend makes two calls: POST /comment then POST /attachments.
 
         public async Task<(TicketAttachmentDto? attachment, string? error)> UploadAttachmentAsync(
             int ticketId, IFormFile? file, int userId, string role)
@@ -575,12 +616,27 @@ namespace backend.Application.Services
             if (file == null || file.Length == 0)
                 return (null, "No file provided.");
 
-            var ext = Path.GetExtension(file.FileName);
-            if (!AllowedExtensions.Contains(ext))
-                return (null, $"File type '{ext}' is not allowed. Allowed: {string.Join(", ", AllowedExtensions)}");
-            if (file.Length > MaxFileSizeBytes)
-                return (null, "File size exceeds the 10 MB limit.");
+            // ── Extension validation ──────────────────────────────────────────
+            var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
 
+            if (BlockedExtensions.Contains(ext))
+                return (null, $"File type '{ext}' is explicitly blocked for security reasons.");
+
+            if (!AllowedExtensions.Contains(ext))
+                return (null, $"File type '{ext}' is not allowed. Allowed: {string.Join(", ", AllowedExtensions.OrderBy(e => e))}");
+
+            // ── Size validation ───────────────────────────────────────────────
+            if (file.Length > _maxFileSizeBytes)
+                return (null, $"File size exceeds the {_maxFileSizeBytes / (1024 * 1024)} MB limit.");
+
+            // ── Magic-byte validation (catch executables disguised as other types) ──
+            await using var peekStream = file.OpenReadStream();
+            var header = new byte[8];
+            var read   = await peekStream.ReadAsync(header.AsMemory(0, header.Length));
+            if (HasForbiddenMagicBytes(header, read))
+                return (null, "File content does not match the declared file type. Executable content is not allowed.");
+
+            // ── Ticket access validation ──────────────────────────────────────
             var ticket = await _repo.GetTicketWithStatusAsync(ticketId);
             if (ticket == null) return (null, "Ticket not found.");
 
@@ -598,29 +654,42 @@ namespace backend.Application.Services
                     return (null, "Ticket does not belong to your department.");
             }
 
-            var webRoot = string.IsNullOrEmpty(_env.WebRootPath)
-                ? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot")
-                : _env.WebRootPath;
+            // ── Save file via storage service ─────────────────────────────────
+            peekStream.Seek(0, SeekOrigin.Begin);
+            var (storedFileName, virtualPath) = await _fileStorage.SaveFileAsync(
+                peekStream, ticketId, file.FileName, ext);
 
-            var folder = Path.Combine(webRoot, "uploads", "attachments", ticketId.ToString());
-            Directory.CreateDirectory(folder);
+            // ── Create auto-generated timeline comment ────────────────────────
+            var uploader = await _repo.FindUserAsync(userId);
+            var uploaderName = uploader != null
+                ? uploader.FirstName + " " + uploader.LastName
+                : "Unknown";
 
-            var storedName   = $"{Guid.NewGuid()}{ext}";
-            var physicalPath = Path.Combine(folder, storedName);
+            var timelineComment = new TicketComment
+            {
+                TicketId         = ticketId,
+                UserId           = userId,
+                Content          = $"{uploaderName} attached {file.FileName}",
+                IsEscalationComment = false,
+                IsAttachmentOnly = true,
+                CreatedAt        = DateTime.UtcNow
+            };
+            _repo.AddComment(timelineComment);
 
-            await using (var stream = new FileStream(physicalPath, FileMode.Create))
-                await file.CopyToAsync(stream);
+            // Flush to get the comment PK before linking the attachment
+            await _repo.SaveChangesAsync();
 
-            var relativeUrl = $"/uploads/attachments/{ticketId}/{storedName}";
-
+            // ── Persist attachment record ─────────────────────────────────────
             var record = new TicketAttachment
             {
                 TicketId         = ticketId,
                 FileName         = file.FileName,
-                FilePath         = relativeUrl,
+                FilePath         = virtualPath,
+                StoredFileName   = storedFileName,
                 FileSize         = file.Length,
                 FileType         = file.ContentType,
                 UploadedByUserId = userId,
+                CommentId        = timelineComment.Id,
                 UploadedAt       = DateTime.UtcNow
             };
 
@@ -637,7 +706,20 @@ namespace backend.Application.Services
 
             await _repo.SaveChangesAsync();
 
-            var uploader = await _repo.FindUserAsync(userId);
+            // Notify all other participants (bell only)
+            var participants = await _repo.GetTicketParticipantIdsAsync(ticketId, userId);
+            if (participants.Count > 0)
+            {
+                await _notifications.NotifyAsync(
+                    type:           NotificationType.AttachmentAdded,
+                    ticketId:       ticketId,
+                    ticketRef:      ticket.ReferenceNumber,
+                    ticketTitle:    ticket.Title,
+                    recipientUserIds: participants,
+                    message:        $"{uploaderName} attached '{file.FileName}' to ticket {ticket.ReferenceNumber} \"{ticket.Title}\".",
+                    sendEmail:      false);
+            }
+
             return (new TicketAttachmentDto
             {
                 Id               = record.Id,
@@ -646,10 +728,45 @@ namespace backend.Application.Services
                 FileSize         = record.FileSize,
                 FileType         = record.FileType,
                 UploadedByUserId = record.UploadedByUserId,
-                UploadedBy       = uploader != null ? uploader.FirstName + " " + uploader.LastName : "Unknown",
+                UploadedBy       = uploaderName,
                 CommentId        = record.CommentId,
                 UploadedAt       = record.UploadedAt
             }, null);
+        }
+
+        // ── GET ATTACHMENT STREAM (download / preview) ────────────────────────
+
+        public async Task<(Stream? stream, string contentType, string fileName, string? error)> GetAttachmentStreamAsync(
+            int ticketId, int attachmentId, int userId, string role, bool inline)
+        {
+            // Verify ticket access (same rules as GetTicketByIdAsync)
+            var ticket = await _repo.GetTicketWithStatusAsync(ticketId);
+            if (ticket == null) return (null, string.Empty, string.Empty, "Ticket not found.");
+
+            if (role == "Employee" && ticket.CreatedByUserId != userId)
+                return (null, string.Empty, string.Empty, "Access denied.");
+            if (role == "Agent" && ticket.AssignedToUserId != userId)
+                return (null, string.Empty, string.Empty, "Access denied.");
+            if (role == "Manager")
+            {
+                var deptId = await _repo.GetUserDepartmentIdAsync(userId);
+                if (deptId != ticket.DepartmentId)
+                    return (null, string.Empty, string.Empty, "Access denied.");
+            }
+
+            var attachment = await _repo.FindAttachmentAsync(attachmentId);
+            if (attachment == null || attachment.TicketId != ticketId)
+                return (null, string.Empty, string.Empty, "Attachment not found.");
+
+            var (stream, contentType) = await _fileStorage.GetFileStreamAsync(
+                attachment.StoredFileName, ticketId, attachment.FilePath);
+
+            if (stream == null)
+                return (null, string.Empty, string.Empty, "File not found on disk.");
+
+            // For preview: return as-is with Content-Type (browser renders inline)
+            // For download: caller sets Content-Disposition: attachment
+            return (stream, contentType, attachment.FileName, null);
         }
 
         // ── AGENTS AVAILABILITY (Manager assign helper) ───────────────────────
@@ -694,6 +811,37 @@ namespace backend.Application.Services
             }).ToList();
 
             return (result, null);
+        }
+
+        // ── HELPERS ───────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Returns true when the file's magic bytes reveal it is a forbidden executable type,
+        /// regardless of what extension the client declared.
+        /// </summary>
+        private static bool HasForbiddenMagicBytes(byte[] header, int bytesRead)
+        {
+            if (bytesRead < 2) return false;
+
+            // MZ signature — Windows executables: EXE, DLL, COM, etc.
+            if (header[0] == 0x4D && header[1] == 0x5A)
+                return true;
+
+            if (bytesRead < 4) return false;
+
+            // ELF signature — Linux / Unix executables
+            if (header[0] == 0x7F && header[1] == 0x45 && header[2] == 0x4C && header[3] == 0x46)
+                return true;
+
+            // Mach-O thin binary — macOS executables (big-endian)
+            if (header[0] == 0xFE && header[1] == 0xED && header[2] == 0xFA && header[3] == 0xCE)
+                return true;
+
+            // Mach-O thin binary — macOS executables (little-endian)
+            if (header[0] == 0xCE && header[1] == 0xFA && header[2] == 0xED && header[3] == 0xFE)
+                return true;
+
+            return false;
         }
     }
 }

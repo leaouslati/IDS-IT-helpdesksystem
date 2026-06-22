@@ -46,14 +46,17 @@ namespace backend.Application.Interfaces
         // ── Attachments ─────────────────────────────────────────────────────
         Task<List<TicketAttachment>> GetAttachmentsWithUploaderAsync(int ticketId);
         Task<List<TicketAttachment>> GetAttachmentsForDeleteAsync(int ticketId);
+        Task<TicketAttachment?> FindAttachmentAsync(int attachmentId);
         void AddAttachment(TicketAttachment attachment);
 
         // ── ActivityLog ─────────────────────────────────────────────────────
         Task<List<ActivityLog>> GetActivityLogsForTicketAsync(int ticketId);
         void AddActivityLog(ActivityLog log);
 
-        // ── Notifications ───────────────────────────────────────────────────
-        void AddNotification(Notification notification);
+        // ── Participant lookup for notifications ────────────────────────────
+        // Returns unique user IDs of: ticket creator, assigned agent, and all commenters,
+        // excluding the given userId (the person triggering the event).
+        Task<List<int>> GetTicketParticipantIdsAsync(int ticketId, int excludeUserId);
 
         // ── Hours ───────────────────────────────────────────────────────────
         Task<decimal> GetTotalHoursForTicketAsync(int ticketId);

@@ -130,7 +130,8 @@ namespace backend.Presentation.Controllers
         }
 
         // ── POST /api/ticket/{ticketId}/attachments ───────────────────────────
-        // Accepts multipart/form-data; file field name must be "file"
+        // Endpoint design: kept separate from POST /comment so JSON comment contracts are
+        // not disrupted. A standalone upload auto-creates a system-style timeline comment.
         [HttpPost("{ticketId}/attachments")]
         [Authorize(Roles = "Employee,Agent,Manager")]
         public async Task<IActionResult> UploadAttachment(int ticketId, IFormFile? file)
@@ -138,6 +139,34 @@ namespace backend.Presentation.Controllers
             var (attachment, error) = await _ticketService.UploadAttachmentAsync(ticketId, file, CurrentUserId, CurrentRole);
             if (error != null) return ServiceError(error);
             return CreatedAtAction(nameof(GetTicketById), new { id = ticketId }, attachment);
+        }
+
+        // ── GET /api/ticket/{ticketId}/attachments/{id}/download ─────────────
+        /// <summary>Forces browser save via Content-Disposition: attachment.</summary>
+        [HttpGet("{ticketId}/attachments/{attachmentId}/download")]
+        public async Task<IActionResult> DownloadAttachment(int ticketId, int attachmentId)
+        {
+            var (stream, contentType, fileName, error) =
+                await _ticketService.GetAttachmentStreamAsync(ticketId, attachmentId, CurrentUserId, CurrentRole, inline: false);
+
+            if (error != null) return ServiceError(error);
+            if (stream == null) return NotFound(new { message = "File not found." });
+
+            return File(stream, contentType, fileDownloadName: fileName);
+        }
+
+        // ── GET /api/ticket/{ticketId}/attachments/{id}/preview ──────────────
+        /// <summary>Returns the file inline so browsers can render images/PDFs in a lightbox.</summary>
+        [HttpGet("{ticketId}/attachments/{attachmentId}/preview")]
+        public async Task<IActionResult> PreviewAttachment(int ticketId, int attachmentId)
+        {
+            var (stream, contentType, _, error) =
+                await _ticketService.GetAttachmentStreamAsync(ticketId, attachmentId, CurrentUserId, CurrentRole, inline: true);
+
+            if (error != null) return ServiceError(error);
+            if (stream == null) return NotFound(new { message = "File not found." });
+
+            return File(stream, contentType, fileDownloadName: null, enableRangeProcessing: true);
         }
 
         // ── GET /api/ticket/{ticketId}/agents-availability ────────────────────

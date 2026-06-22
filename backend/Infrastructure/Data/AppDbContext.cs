@@ -80,6 +80,12 @@ namespace backend.Infrastructure.Data
             modelBuilder.Entity<TicketHoursLog>()
                 .Property(h => h.HoursWorked)
                 .HasPrecision(8, 2);
+
+            modelBuilder.Entity<Notification>()
+                .HasOne(n => n.Ticket)
+                .WithMany()
+                .HasForeignKey(n => n.TicketId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

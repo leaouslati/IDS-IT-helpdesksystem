@@ -108,6 +108,7 @@ namespace backend.Application.DTOs
         public string UserRole { get; set; } = string.Empty;
         public string Content { get; set; } = string.Empty;
         public bool IsEscalationComment { get; set; }
+        public bool IsAttachmentOnly { get; set; }
         public bool IsInternal { get; set; }
         public DateTime CreatedAt { get; set; }
     }

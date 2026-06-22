@@ -164,6 +164,9 @@ namespace backend.Infrastructure.Repositories
                 .Where(a => a.TicketId == ticketId)
                 .ToListAsync();
 
+        public async Task<TicketAttachment?> FindAttachmentAsync(int attachmentId) =>
+            await _context.TicketAttachments.FindAsync(attachmentId);
+
         public void AddAttachment(TicketAttachment attachment) =>
             _context.TicketAttachments.Add(attachment);
 
@@ -179,10 +182,28 @@ namespace backend.Infrastructure.Repositories
 
         public void AddActivityLog(ActivityLog log) => _context.ActivityLogs.Add(log);
 
-        // ── Notifications ───────────────────────────────────────────────────
+        // ── Participant lookup ───────────────────────────────────────────────
 
-        public void AddNotification(Notification notification) =>
-            _context.Notifications.Add(notification);
+        public async Task<List<int>> GetTicketParticipantIdsAsync(int ticketId, int excludeUserId)
+        {
+            var ticket = await _context.Tickets.FindAsync(ticketId);
+            if (ticket == null) return new List<int>();
+
+            var participants = new HashSet<int>();
+            if (ticket.CreatedByUserId != excludeUserId)
+                participants.Add(ticket.CreatedByUserId);
+            if (ticket.AssignedToUserId.HasValue && ticket.AssignedToUserId.Value != excludeUserId)
+                participants.Add(ticket.AssignedToUserId.Value);
+
+            var commenters = await _context.TicketComments
+                .Where(c => c.TicketId == ticketId && c.UserId != excludeUserId)
+                .Select(c => c.UserId)
+                .Distinct()
+                .ToListAsync();
+
+            foreach (var id in commenters) participants.Add(id);
+            return participants.ToList();
+        }
 
         // ── Hours ───────────────────────────────────────────────────────────
 

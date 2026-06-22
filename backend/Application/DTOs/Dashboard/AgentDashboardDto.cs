@@ -7,6 +7,8 @@ namespace backend.Application.DTOs
         public int InProgress { get; set; }
         public int ResolvedThisWeek { get; set; }
         public int EscalatedCount { get; set; }
+        public double AvgResolutionHours { get; set; }
+        public int ResolvedPreviousWindow { get; set; }
         public List<RecentTicketDto> MyTickets { get; set; } = new();
         public List<RecentActivityDto> RecentActivity { get; set; } = new();
     }
