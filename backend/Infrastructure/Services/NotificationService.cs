@@ -40,10 +40,12 @@ namespace backend.Infrastructure.Services
             var title = BuildTitle(type, ticketRef);
             var now   = DateTime.UtcNow;
 
-            // 1. Persist one row per recipient
+            // 1. Persist one row per recipient, keeping track of each entity
+            //    so EF Core populates the PK after SaveChangesAsync.
+            var saved = new List<Notification>(recipients.Count);
             foreach (var userId in recipients)
             {
-                await _repo.AddAsync(new Notification
+                var n = new Notification
                 {
                     UserId    = userId,
                     TicketId  = ticketId,
@@ -52,51 +54,56 @@ namespace backend.Infrastructure.Services
                     Message   = message,
                     IsRead    = false,
                     CreatedAt = now
-                });
+                };
+                await _repo.AddAsync(n);
+                saved.Add(n);
             }
             await _repo.SaveChangesAsync();
+            // EF Core has now populated n.Id on every saved entity.
 
-            // Re-fetch the saved rows (they now have PKs) to build push DTOs
-            // We build the push payload inline from what we know — avoids extra query
-            var pushDto = new NotificationDto
+            // 2. Push via SignalR (fire-and-forget per recipient, each with its own DB Id)
+            foreach (var n in saved)
             {
-                TicketId  = ticketId,
-                Type      = type,
-                Title     = title,
-                Message   = message,
-                IsRead    = false,
-                CreatedAt = now
-            };
-
-            // 2. Push via SignalR (fire-and-forget per recipient)
-            foreach (var userId in recipients)
-            {
-                _ = _hub.Clients.User(userId.ToString())
+                var pushDto = new NotificationDto
+                {
+                    Id        = n.Id,
+                    TicketId  = ticketId,
+                    Type      = type,
+                    Title     = title,
+                    Message   = message,
+                    IsRead    = false,
+                    CreatedAt = now
+                };
+                _ = _hub.Clients.User(n.UserId.ToString())
                     .SendAsync("ReceiveNotification", pushDto);
             }
 
-            // 3. Send email for email-worthy events (fire-and-forget, does not block the request)
+            // 3. Send email for email-worthy events.
+            // Resolve emails NOW (inside the current scope/DbContext) then hand off
+            // only the SMTP work as fire-and-forget — no DbContext is touched after this point.
             if (sendEmail)
             {
-                _ = SendEmailsAsync(recipients, ticketId, ticketTitle, message);
+                var userEmails = await _repo.GetUserEmailsAsync(recipients);
+                var appBase    = _config["AppBaseUrl"] ?? "http://localhost:8080";
+                _ = SendEmailsAsync(userEmails, appBase, ticketId, ticketTitle, message);
             }
         }
 
         private async Task SendEmailsAsync(
-            List<int> recipients, int ticketId, string ticketTitle, string message)
+            List<(int UserId, string Email)> userEmails,
+            string appBase,
+            int ticketId,
+            string ticketTitle,
+            string message)
         {
-            var userEmails = await _repo.GetUserEmailsAsync(recipients);
-            var appBase    = _config["AppBaseUrl"] ?? "http://localhost:5173";
-
-            foreach (var (userId, email) in userEmails)
+            foreach (var (_, email) in userEmails)
             {
                 if (string.IsNullOrWhiteSpace(email)) continue;
 
-                // Re-use the stored message as the description in the email body
                 var body = EmailService.BuildTicketEmailBody(
                     recipientName:    email,
                     eventDescription: message,
-                    ticketRef:        $"(see ticket)",
+                    ticketRef:        "(see ticket)",
                     ticketTitle:      ticketTitle,
                     appBaseUrl:       appBase,
                     ticketId:         ticketId);

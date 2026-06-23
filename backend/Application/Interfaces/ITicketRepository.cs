@@ -30,6 +30,7 @@ namespace backend.Application.Interfaces
         // ── Department ──────────────────────────────────────────────────────
         Task<Department?> FindDepartmentAsync(int id);
         Task<int?> GetDepartmentManagerIdAsync(int deptId);
+        Task<int?> GetManagerUserIdForDepartmentAsync(int deptId);
 
         // ── Agent queries ───────────────────────────────────────────────────
         Task<int> CountActiveTicketsByAgentAsync(int agentId);

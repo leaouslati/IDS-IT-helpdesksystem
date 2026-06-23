@@ -99,6 +99,12 @@ namespace backend.Infrastructure.Repositories
                 .Select(d => d.ManagerId)
                 .FirstOrDefaultAsync();
 
+        public async Task<int?> GetManagerUserIdForDepartmentAsync(int deptId) =>
+            await _context.Users
+                .Where(u => u.DepartmentId == deptId && u.IsActive && u.Role.Name == "Manager")
+                .Select(u => (int?)u.Id)
+                .FirstOrDefaultAsync();
+
         // ── Agent queries ───────────────────────────────────────────────────
 
         public async Task<int> CountActiveTicketsByAgentAsync(int agentId) =>

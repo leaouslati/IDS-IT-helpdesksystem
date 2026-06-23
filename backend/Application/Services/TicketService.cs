@@ -220,15 +220,15 @@ namespace backend.Application.Services
             await _repo.SaveChangesAsync();
 
             // Notify department manager (bell + email)
-            var dept = await _repo.FindDepartmentAsync(user.DepartmentId.Value);
-            if (dept?.ManagerId != null)
+            var managerId = await _repo.GetDepartmentManagerIdAsync(user.DepartmentId.Value);
+            if (managerId.HasValue)
             {
                 await _notifications.NotifyAsync(
                     type:           NotificationType.TicketCreated,
                     ticketId:       ticket.Id,
                     ticketRef:      ticket.ReferenceNumber,
                     ticketTitle:    ticket.Title,
-                    recipientUserIds: new[] { dept.ManagerId.Value },
+                    recipientUserIds: new[] { managerId.Value },
                     message:        $"New ticket {ticket.ReferenceNumber} submitted in your department: \"{ticket.Title}\". Please assign it to an agent.",
                     sendEmail:      true);
             }

@@ -629,6 +629,36 @@ namespace backend.Infrastructure.Data
                     await context.SaveChangesAsync();
                 }
             }
+
+            // ── Reconcile Department.ManagerId ─────────────────────────────────
+            // Ensure every department's ManagerId points to the active Manager user
+            // who has that department assigned. Runs on every startup so stale
+            // assignments (e.g. from a role change) are automatically corrected.
+            var allDepts = await context.Departments.ToListAsync();
+            var managerRoleName = "Manager";
+            var managerUsers = await context.Users
+                .Include(u => u.Role)
+                .Where(u => u.Role.Name == managerRoleName && u.IsActive && u.DepartmentId.HasValue)
+                .ToListAsync();
+
+            bool reconciled = false;
+            foreach (var dept in allDepts)
+            {
+                // Find the active Manager assigned to this department
+                var deptManager = managerUsers
+                    .Where(u => u.DepartmentId == dept.Id)
+                    .OrderByDescending(u => u.Id) // most recently created wins
+                    .FirstOrDefault();
+
+                var expectedManagerId = deptManager?.Id;
+
+                if (dept.ManagerId != expectedManagerId)
+                {
+                    dept.ManagerId = expectedManagerId;
+                    reconciled = true;
+                }
+            }
+            if (reconciled) await context.SaveChangesAsync();
         }
     }
 }
