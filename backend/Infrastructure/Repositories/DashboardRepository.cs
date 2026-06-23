@@ -17,8 +17,12 @@ namespace backend.Infrastructure.Repositories
 
         // ── Admin ────────────────────────────────────────────────────────────
 
-        public async Task<int> CountTicketsByStatusNameAsync(string statusName) =>
-            await _context.Tickets.CountAsync(t => t.TicketStatus.Name == statusName);
+        public async Task<int> CountTicketsByStatusNameAsync(string statusName, DateTime? since = null)
+        {
+            var q = _context.Tickets.Where(t => t.TicketStatus.Name == statusName);
+            if (since.HasValue) q = q.Where(t => t.CreatedAt >= since.Value);
+            return await q.CountAsync();
+        }
 
         public async Task<int> CountTicketsResolvedOnDateAsync(DateTime date) =>
             await _context.Tickets.CountAsync(t =>
@@ -35,11 +39,19 @@ namespace backend.Infrastructure.Repositories
                 ? await _context.Users.CountAsync(u => u.IsActive == isActive.Value)
                 : await _context.Users.CountAsync();
 
-        public async Task<int> CountAllTicketsAsync() =>
-            await _context.Tickets.CountAsync();
+        public async Task<int> CountAllTicketsAsync(DateTime? since = null)
+        {
+            var q = _context.Tickets.AsQueryable();
+            if (since.HasValue) q = q.Where(t => t.CreatedAt >= since.Value);
+            return await q.CountAsync();
+        }
 
-        public async Task<int> CountEscalatedTicketsAsync() =>
-            await _context.Tickets.CountAsync(t => t.IsEscalated);
+        public async Task<int> CountEscalatedTicketsAsync(DateTime? since = null)
+        {
+            var q = _context.Tickets.Where(t => t.IsEscalated);
+            if (since.HasValue) q = q.Where(t => t.CreatedAt >= since.Value);
+            return await q.CountAsync();
+        }
 
         public async Task<List<TicketTrendDto>> GetTicketTrendAsync(DateTime from)
         {
@@ -54,8 +66,8 @@ namespace backend.Infrastructure.Repositories
                 .Select(i => today.AddDays(i - 6))
                 .Select(date => new TicketTrendDto
                 {
-                    Date = date.ToString("MMM dd"),
-                    Created = raw.Count(t => t.CreatedAt.Date == date),
+                    Date     = date.ToString("MMM dd"),
+                    Created  = raw.Count(t => t.CreatedAt.Date == date),
                     Resolved = raw.Count(t =>
                         t.StatusName == "Resolved" &&
                         t.UpdatedAt.HasValue &&
@@ -64,20 +76,22 @@ namespace backend.Infrastructure.Repositories
                 .ToList();
         }
 
-        public async Task<List<CategoryBreakdownDto>> GetCategoryBreakdownAsync(int? deptId = null)
+        public async Task<List<CategoryBreakdownDto>> GetCategoryBreakdownAsync(int? deptId = null, DateTime? since = null)
         {
             var query = _context.Tickets.AsQueryable();
             if (deptId.HasValue) query = query.Where(t => t.DepartmentId == deptId.Value);
+            if (since.HasValue)  query = query.Where(t => t.CreatedAt >= since.Value);
             return await query
                 .GroupBy(t => t.Category.Name)
                 .Select(g => new CategoryBreakdownDto { Category = g.Key, Count = g.Count() })
                 .ToListAsync();
         }
 
-        public async Task<List<PriorityBreakdownDto>> GetPriorityBreakdownAsync(int? deptId = null)
+        public async Task<List<PriorityBreakdownDto>> GetPriorityBreakdownAsync(int? deptId = null, DateTime? since = null)
         {
             var query = _context.Tickets.AsQueryable();
             if (deptId.HasValue) query = query.Where(t => t.DepartmentId == deptId.Value);
+            if (since.HasValue)  query = query.Where(t => t.CreatedAt >= since.Value);
             return await query
                 .GroupBy(t => t.Priority.Name)
                 .Select(g => new PriorityBreakdownDto { Priority = g.Key, Count = g.Count() })
@@ -93,8 +107,8 @@ namespace backend.Infrastructure.Repositories
                 .Take(take)
                 .Select(a => new RecentActivityDto
                 {
-                    Action = a.Action,
-                    Details = a.Details ?? string.Empty,
+                    Action   = a.Action,
+                    Details  = a.Details ?? string.Empty,
                     UserName = a.User.FirstName + " " + a.User.LastName,
                     LoggedAt = a.LoggedAt
                 })
@@ -136,6 +150,36 @@ namespace backend.Infrastructure.Repositories
                 .ToListAsync();
         }
 
+        public async Task<List<AgentWorkloadDto>> GetAgentWorkloadsAsync()
+        {
+            var agentRoleId = await _context.Roles
+                .Where(r => r.Name == "Agent")
+                .Select(r => r.Id)
+                .FirstAsync();
+
+            var agents = await _context.Users
+                .Where(u => u.RoleId == agentRoleId && u.IsActive)
+                .Select(u => new { u.Id, u.FirstName, u.LastName })
+                .ToListAsync();
+
+            var agentIds = agents.Select(a => a.Id).ToList();
+
+            var activeCounts = await _context.Tickets
+                .Where(t => t.AssignedToUserId.HasValue &&
+                            agentIds.Contains(t.AssignedToUserId.Value) &&
+                            t.TicketStatus.Name != "Resolved")
+                .GroupBy(t => t.AssignedToUserId!.Value)
+                .Select(g => new { AgentId = g.Key, Count = g.Count() })
+                .ToListAsync();
+
+            return agents.Select(a => new AgentWorkloadDto
+            {
+                AgentId       = a.Id,
+                AgentName     = a.FirstName + " " + a.LastName,
+                ActiveTickets = activeCounts.FirstOrDefault(c => c.AgentId == a.Id)?.Count ?? 0
+            }).ToList();
+        }
+
         // ── Manager ──────────────────────────────────────────────────────────
 
         public async Task<int?> GetUserDepartmentIdAsync(int userId) =>
@@ -144,9 +188,15 @@ namespace backend.Infrastructure.Repositories
                 .Select(u => u.DepartmentId)
                 .FirstOrDefaultAsync();
 
-        public async Task<int> CountDeptTicketsByStatusNamesAsync(int deptId, IEnumerable<string> statusNames) =>
-            await _context.Tickets.CountAsync(t =>
-                t.DepartmentId == deptId && statusNames.Contains(t.TicketStatus.Name));
+        public async Task<int> CountDeptTicketsByStatusNamesAsync(
+            int deptId, IEnumerable<string> statusNames, DateTime? since = null)
+        {
+            var names = statusNames.ToList();
+            var q = _context.Tickets.Where(t =>
+                t.DepartmentId == deptId && names.Contains(t.TicketStatus.Name));
+            if (since.HasValue) q = q.Where(t => t.CreatedAt >= since.Value);
+            return await q.CountAsync();
+        }
 
         public async Task<int> CountDeptUnassignedTicketsAsync(int deptId) =>
             await _context.Tickets.CountAsync(t =>
@@ -162,15 +212,20 @@ namespace backend.Infrastructure.Repositories
                 t.TicketStatus.Name == "Resolved" &&
                 t.UpdatedAt.HasValue && t.UpdatedAt.Value >= since);
 
-        public async Task<List<(DateTime CreatedAt, DateTime UpdatedAt)>> GetResolvedTicketTimesAsync(int deptId) =>
-            (await _context.Tickets
+        public async Task<List<(DateTime CreatedAt, DateTime UpdatedAt)>> GetResolvedTicketTimesAsync(
+            int deptId, DateTime? since = null)
+        {
+            var q = _context.Tickets
                 .Where(t => t.DepartmentId == deptId &&
                     t.TicketStatus.Name == "Resolved" &&
-                    t.UpdatedAt.HasValue)
+                    t.UpdatedAt.HasValue);
+            if (since.HasValue) q = q.Where(t => t.UpdatedAt >= since.Value);
+            return (await q
                 .Select(t => new { t.CreatedAt, UpdatedAt = (DateTime)t.UpdatedAt! })
                 .ToListAsync())
                 .Select(x => (x.CreatedAt, x.UpdatedAt))
                 .ToList();
+        }
 
         public async Task<int> GetAgentRoleIdAsync() =>
             await _context.Roles
@@ -255,9 +310,14 @@ namespace backend.Infrastructure.Repositories
                 t.AssignedToUserId == agentId &&
                 t.TicketStatus.Name != "Resolved");
 
-        public async Task<int> CountAgentTicketsByStatusNameAsync(int agentId, string statusName) =>
-            await _context.Tickets.CountAsync(t =>
+        public async Task<int> CountAgentTicketsByStatusNameAsync(
+            int agentId, string statusName, DateTime? since = null)
+        {
+            var q = _context.Tickets.Where(t =>
                 t.AssignedToUserId == agentId && t.TicketStatus.Name == statusName);
+            if (since.HasValue) q = q.Where(t => t.CreatedAt >= since.Value);
+            return await q.CountAsync();
+        }
 
         public async Task<int> CountAgentTicketsResolvedTodayAsync(int agentId)
         {
@@ -278,11 +338,28 @@ namespace backend.Infrastructure.Repositories
         public async Task<int> CountAgentEscalatedTicketsAsync(int agentId) =>
             await _context.Tickets.CountAsync(t => t.EscalatedByUserId == agentId);
 
+        public async Task<List<(DateTime CreatedAt, DateTime UpdatedAt)>> GetAgentResolvedTicketTimesAsync(
+            int agentId, DateTime since) =>
+            (await _context.Tickets
+                .Where(t =>
+                    t.AssignedToUserId == agentId &&
+                    t.TicketStatus.Name == "Resolved" &&
+                    t.UpdatedAt.HasValue && t.UpdatedAt.Value >= since)
+                .Select(t => new { t.CreatedAt, UpdatedAt = (DateTime)t.UpdatedAt! })
+                .ToListAsync())
+                .Select(x => (x.CreatedAt, x.UpdatedAt))
+                .ToList();
+
         // ── Employee ──────────────────────────────────────────────────────────
 
-        public async Task<int> CountEmployeeTicketsByStatusNameAsync(int employeeId, string statusName) =>
-            await _context.Tickets.CountAsync(t =>
+        public async Task<int> CountEmployeeTicketsByStatusNameAsync(
+            int employeeId, string statusName, DateTime? since = null)
+        {
+            var q = _context.Tickets.Where(t =>
                 t.CreatedByUserId == employeeId && t.TicketStatus.Name == statusName);
+            if (since.HasValue) q = q.Where(t => t.CreatedAt >= since.Value);
+            return await q.CountAsync();
+        }
 
         public async Task<int> CountEmployeeTicketsByStatusNamesAsync(int employeeId, IEnumerable<string> statusNames) =>
             await _context.Tickets.CountAsync(t =>
@@ -298,6 +375,9 @@ namespace backend.Infrastructure.Repositories
                 .Select(n => new NotificationDto
                 {
                     Id        = n.Id,
+                    TicketId  = n.TicketId,
+                    Type      = n.Type,
+                    Title     = n.Title,
                     Message   = n.Message,
                     IsRead    = n.IsRead,
                     CreatedAt = n.CreatedAt

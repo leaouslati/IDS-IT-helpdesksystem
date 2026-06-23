@@ -13,6 +13,8 @@ namespace backend.Domain.Entities
         public User User { get; set; } = null!;
         public string Content { get; set; } = string.Empty;
         public bool IsEscalationComment { get; set; } = false;
+        // True for auto-generated timeline entries when a file is uploaded without comment text
+        public bool IsAttachmentOnly { get; set; } = false;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 }

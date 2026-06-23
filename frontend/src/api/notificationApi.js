@@ -1,8 +1,8 @@
 import api from "./axios";
 
 export const notificationApi = {
-  getNotifications() {
-    return api.get("/notification");
+  getNotifications(page = 1, pageSize = 20) {
+    return api.get("/notification", { params: { page, pageSize } });
   },
   markAsRead(id) {
     return api.put(`/notification/${id}/read`);

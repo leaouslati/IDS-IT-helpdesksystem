@@ -4,9 +4,9 @@ namespace backend.Application.Interfaces
 {
     public interface IDashboardService
     {
-        Task<AdminDashboardDto> GetAdminDashboardAsync();
-        Task<ManagerDashboardDto> GetManagerDashboardAsync(int managerId);
-        Task<AgentDashboardDto> GetAgentDashboardAsync(int agentUserId);
-        Task<EmployeeDashboardDto> GetEmployeeDashboardAsync(int employeeUserId);
+        Task<AdminDashboardDto>    GetAdminDashboardAsync(int days = 30);
+        Task<ManagerDashboardDto>  GetManagerDashboardAsync(int managerId, int days = 30);
+        Task<AgentDashboardDto>    GetAgentDashboardAsync(int agentUserId, int days = 30);
+        Task<EmployeeDashboardDto> GetEmployeeDashboardAsync(int employeeUserId, int days = 30);
     }
 }

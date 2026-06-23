@@ -2,7 +2,6 @@
   <AppLayout
     :navLinks="navLinks"
     pageTitle="Dashboard"
-    :notificationCount="data?.inProgress ?? 0"
   >
     <!-- Loading -->
     <div v-if="loading" class="flex items-center justify-center min-h-[60vh]">
@@ -45,21 +44,30 @@
             Dashboard
           </h1>
         </div>
+        <div class="flex items-center gap-1 bg-gray-100 dark:bg-white/5 rounded-lg p-1">
+          <button
+            v-for="d in daysOptions"
+            :key="d"
+            @click="days = d"
+            class="px-3 py-1.5 rounded-md text-xs font-semibold transition-colors"
+            :class="
+              days === d
+                ? 'bg-white dark:bg-white/10 text-[#0F172A] dark:text-white shadow-sm'
+                : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+            "
+          >
+            {{ d }}d
+          </button>
+        </div>
       </div>
 
       <!-- Stat cards -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <StatCard
           title="Assigned to Me"
           :value="data?.assignedToMe ?? 0"
           color="#10B981"
           :icon="Inbox"
-        />
-        <StatCard
-          title="Resolved Today"
-          :value="data?.resolvedToday ?? 0"
-          color="#10B981"
-          :icon="CheckCircle2"
         />
         <StatCard
           title="In Progress"
@@ -135,7 +143,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import {
   LayoutDashboard,
@@ -143,7 +151,6 @@ import {
   Bell,
   User,
   Inbox,
-  CheckCircle2,
   Clock,
   TrendingUp,
   AlertCircle,
@@ -210,12 +217,14 @@ const ticketColumns = [
 const loading = ref(true);
 const error = ref("");
 const data = ref(null);
+const days = ref(30);
+const daysOptions = [7, 14, 30];
 
 async function fetchData() {
   loading.value = true;
   error.value = "";
   try {
-    const res = await api.get("/dashboard/agent");
+    const res = await api.get("/dashboard/agent", { params: { days: days.value } });
     data.value = res.data;
   } catch (e) {
     error.value =
@@ -226,6 +235,7 @@ async function fetchData() {
 }
 
 onMounted(fetchData);
+watch(days, fetchData);
 
 async function startWorking(ticket) {
   router.push(`/tickets/${ticket.id}`);

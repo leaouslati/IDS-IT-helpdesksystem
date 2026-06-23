@@ -15,5 +15,7 @@ namespace backend.Application.DTOs
         public List<PriorityBreakdownDto> PriorityBreakdown { get; set; } = new();
         public List<RecentActivityDto> RecentActivity { get; set; } = new();
         public List<RecentTicketDto> RecentTickets { get; set; } = new();
+        /// <summary>Active ticket count per agent — shows workload distribution across the system.</summary>
+        public List<AgentWorkloadDto> AgentWorkload { get; set; } = new();
     }
 }

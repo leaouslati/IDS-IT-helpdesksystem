@@ -26,10 +26,11 @@
         v-for="comment in comments"
         :key="comment.id"
         class="flex gap-3"
-        :class="isRightSide(comment) ? 'flex-row-reverse' : ''"
+        :class="comment.isAttachmentOnly ? 'justify-center' : isRightSide(comment) ? 'flex-row-reverse' : ''"
       >
-        <!-- Avatar: initials derived from userName -->
+        <!-- Avatar: hidden for attachment-only entries -->
         <div
+          v-if="!comment.isAttachmentOnly"
           class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-[11px] font-bold mt-0.5"
           :class="
             isRightSide(comment)
@@ -43,11 +44,15 @@
 
         <!-- Bubble -->
         <div
-          class="max-w-[75%] min-w-0"
-          :class="isRightSide(comment) ? 'items-end flex flex-col' : ''"
+          :class="[
+            'min-w-0',
+            comment.isAttachmentOnly ? 'max-w-[90%]' : 'max-w-[75%]',
+            !comment.isAttachmentOnly && isRightSide(comment) ? 'items-end flex flex-col' : ''
+          ]"
         >
-          <!-- Meta -->
+          <!-- Meta (hidden for attachment-only) -->
           <div
+            v-if="!comment.isAttachmentOnly"
             class="flex items-center gap-2 mb-1"
             :class="isRightSide(comment) ? 'flex-row-reverse' : ''"
           >
@@ -70,9 +75,18 @@
             </span>
           </div>
 
+          <!-- Attachment-only system entry -->
+          <div
+            v-if="comment.isAttachmentOnly"
+            class="px-4 py-2.5 rounded-xl border border-dashed border-gray-200 dark:border-white/10 bg-gray-50/60 dark:bg-white/[0.02] text-sm flex items-center gap-2"
+          >
+            <Paperclip :size="12" class="text-gray-400 flex-shrink-0" />
+            <span class="text-gray-500 dark:text-gray-400 text-[12px]" v-html="comment.content" />
+          </div>
+
           <!-- Escalation comment -->
           <div
-            v-if="comment.isEscalationComment"
+            v-else-if="comment.isEscalationComment"
             class="px-4 py-3 rounded-xl border-l-4 border-orange-400 bg-orange-50 dark:bg-orange-900/10 text-sm text-orange-800 dark:text-orange-300"
           >
             <div class="flex items-center gap-1.5 mb-1.5">

@@ -16,6 +16,8 @@ namespace backend.Application.Interfaces
         Task<(TicketCommentDto? comment, string? error)> AddCommentAsync(int ticketId, AddCommentDto dto, int userId, string role);
         Task<IEnumerable<TicketCommentDto>> GetCommentsAsync(int ticketId, int userId, string role);
         Task<(TicketAttachmentDto? attachment, string? error)> UploadAttachmentAsync(int ticketId, IFormFile? file, int userId, string role);
+        Task<(Stream? stream, string contentType, string fileName, string? error)> GetAttachmentStreamAsync(
+            int ticketId, int attachmentId, int userId, string role, bool inline);
         Task<(IEnumerable<AgentAvailabilityDto> agents, string? error)> GetAgentsAvailabilityAsync(int ticketId, int managerId);
     }
 }

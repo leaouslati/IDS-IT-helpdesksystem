@@ -3,7 +3,10 @@ using backend.Application.MappingProfiles;
 using backend.Application.Services;
 using backend.Infrastructure.Data;
 using backend.Infrastructure.Repositories;
+using backend.Infrastructure.Services;
+using backend.Presentation.Hubs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -30,6 +33,11 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // ── AutoMapper ────────────────────────────────────────────────────────────────
 builder.Services.AddAutoMapper(cfg => cfg.AddMaps(typeof(TicketMappingProfile).Assembly));
 
+// ── SignalR ───────────────────────────────────────────────────────────────────
+builder.Services.AddSignalR();
+// Map authenticated user's numeric ID claim to SignalR's user identifier
+builder.Services.AddSingleton<IUserIdProvider, UserIdProvider>();
+
 // ── Repository registrations ──────────────────────────────────────────────────
 builder.Services.AddScoped<ITicketRepository,         TicketRepository>();
 builder.Services.AddScoped<ITicketHoursLogRepository, TicketHoursLogRepository>();
@@ -37,6 +45,7 @@ builder.Services.AddScoped<IAuthRepository,           AuthRepository>();
 builder.Services.AddScoped<ILookupRepository,         LookupRepository>();
 builder.Services.AddScoped<IDashboardRepository,      DashboardRepository>();
 builder.Services.AddScoped<IAdminRepository,          AdminRepository>();
+builder.Services.AddScoped<INotificationRepository,   NotificationRepository>();
 
 // ── Service registrations ─────────────────────────────────────────────────────
 builder.Services.AddScoped<IAuthService,           AuthService>();
@@ -45,6 +54,9 @@ builder.Services.AddScoped<ITicketService,         TicketService>();
 builder.Services.AddScoped<ILookupService,         LookupService>();
 builder.Services.AddScoped<ITicketHoursLogService, TicketHoursLogService>();
 builder.Services.AddScoped<IAdminService,          AdminService>();
+builder.Services.AddScoped<INotificationService,   NotificationService>();
+builder.Services.AddScoped<IFileStorageService,    FileStorageService>();
+builder.Services.AddSingleton<IEmailService,       EmailService>();
 
 // ── JWT Authentication ────────────────────────────────────────────────────────
 var jwtKey      = builder.Configuration["Jwt:Key"]!;
@@ -65,16 +77,31 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey         = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(jwtKey))
         };
+
+        // Allow SignalR to pass the JWT token via query string (WebSocket cannot set headers)
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path        = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                    context.Token = accessToken;
+                return Task.CompletedTask;
+            }
+        };
     });
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
+// AllowCredentials() is required for SignalR WebSocket/SSE transport cross-origin
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowVue", policy =>
     {
         policy.WithOrigins("http://localhost:5173", "http://localhost:8080")
               .AllowAnyHeader()
-              .AllowAnyMethod();
+              .AllowAnyMethod()
+              .AllowCredentials();
     });
 });
 
@@ -181,14 +208,43 @@ using (var scope = app.Services.CreateScope())
             CONSTRAINT FK_TicketHoursLogs_Users_AgentId FOREIGN KEY (AgentId) REFERENCES Users(Id)
         )");
 
+    // ── Week 5 schema additions ────────────────────────────────────────────
+
+    // Notification: add TicketId, Type, Title columns
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Notifications') AND name = 'TicketId')
+        ALTER TABLE Notifications ADD TicketId int NULL");
+
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Notifications') AND name = 'Type')
+        ALTER TABLE Notifications ADD Type nvarchar(100) NOT NULL DEFAULT ''");
+
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Notifications') AND name = 'Title')
+        ALTER TABLE Notifications ADD Title nvarchar(200) NOT NULL DEFAULT ''");
+
+    // TicketAttachment: add StoredFileName for new file storage scheme
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('TicketAttachments') AND name = 'StoredFileName')
+        ALTER TABLE TicketAttachments ADD StoredFileName nvarchar(300) NOT NULL DEFAULT ''");
+
+    // TicketComments: add IsAttachmentOnly for system-generated timeline entries
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('TicketComments') AND name = 'IsAttachmentOnly')
+        ALTER TABLE TicketComments ADD IsAttachmentOnly bit NOT NULL DEFAULT 0");
+
     await DbSeeder.SeedAsync(db);
 }
 
-// ── Static files & upload directory ──────────────────────────────────────────
+// ── Upload directory (legacy wwwroot location still served for existing files) ──
 var uploadsDir = Path.Combine(
     app.Environment.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"),
     "uploads", "attachments");
 Directory.CreateDirectory(uploadsDir);
+
+// ── App_Data upload directory (new protected storage) ────────────────────────
+var appDataDir = Path.Combine(Directory.GetCurrentDirectory(), "App_Data", "uploads", "tickets");
+Directory.CreateDirectory(appDataDir);
 
 if (app.Environment.IsDevelopment())
 {
@@ -202,5 +258,8 @@ app.UseCors("AllowVue");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
+// ── SignalR hub ───────────────────────────────────────────────────────────────
+app.MapHub<NotificationHub>("/hubs/notifications");
 
 app.Run();

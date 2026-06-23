@@ -52,6 +52,18 @@ namespace backend.Application.Services
             _repo.AddUser(user);
             await _repo.SaveChangesAsync();
 
+            // If the new user is a Manager, register them as their department's manager
+            var roleName = await _repo.GetRoleNameAsync(dto.RoleId);
+            if (roleName == "Manager" && dto.DepartmentId.HasValue)
+            {
+                var dept = await _repo.GetDepartmentAsync(dto.DepartmentId.Value);
+                if (dept != null)
+                {
+                    dept.ManagerId = user.Id;
+                    await _repo.SaveChangesAsync();
+                }
+            }
+
             var created = await _repo.GetUserByIdWithDetailsAsync(user.Id);
             return (ToDto(created!), null);
         }
@@ -103,7 +115,27 @@ namespace backend.Application.Services
             if (!await _repo.RoleExistsAsync(dto.RoleId))
                 return (false, "Invalid role selected.");
 
+            var previousRoleName = user.Role?.Name;
+            var newRoleName      = await _repo.GetRoleNameAsync(dto.RoleId);
+
             user.RoleId = dto.RoleId;
+
+            // If the user was a Manager and is being demoted, clear their dept's ManagerId
+            if (previousRoleName == "Manager" && newRoleName != "Manager" && user.DepartmentId.HasValue)
+            {
+                var dept = await _repo.GetDepartmentAsync(user.DepartmentId.Value);
+                if (dept != null && dept.ManagerId == userId)
+                    dept.ManagerId = null;
+            }
+
+            // If the user is being promoted to Manager, register them as dept manager
+            if (newRoleName == "Manager" && previousRoleName != "Manager" && user.DepartmentId.HasValue)
+            {
+                var dept = await _repo.GetDepartmentAsync(user.DepartmentId.Value);
+                if (dept != null)
+                    dept.ManagerId = userId;
+            }
+
             await _repo.SaveChangesAsync();
             return (true, null);
         }

@@ -52,9 +52,27 @@ namespace backend.Application.DTOs
     public class NotificationDto
     {
         public int Id { get; set; }
+        public int? TicketId { get; set; }
+        public string Type { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
         public string Message { get; set; } = string.Empty;
         public bool IsRead { get; set; }
         public DateTime CreatedAt { get; set; }
+    }
+
+    public class NotificationPagedDto
+    {
+        public List<NotificationDto> Items { get; set; } = new();
+        public int TotalCount { get; set; }
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+    }
+
+    public class AgentWorkloadDto
+    {
+        public int AgentId { get; set; }
+        public string AgentName { get; set; } = string.Empty;
+        public int ActiveTickets { get; set; }
     }
 
     public class AgentAvailabilityDto

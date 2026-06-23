@@ -2,7 +2,6 @@
   <AppLayout
     :navLinks="navLinks"
     pageTitle="Dashboard"
-    :notificationCount="data?.recentActivity?.length ?? 0"
   >
     <!-- Loading -->
     <div v-if="loading" class="flex items-center justify-center min-h-[60vh]">
@@ -51,18 +50,22 @@
           </p>
         </div>
         <div class="flex items-center gap-2 flex-shrink-0">
-          <button
-            class="px-4 py-2 rounded-lg border border-gray-200 dark:border-white/10 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
-          >
-            <CalendarDays :size="14" />
-            Last 7 Days
-          </button>
-          <button
-            class="px-4 py-2 rounded-lg bg-[#0F172A] dark:bg-white/10 text-white text-sm font-semibold hover:bg-gray-800 dark:hover:bg-white/20 transition-colors flex items-center gap-2"
-          >
-            <Download :size="14" />
-            Export Report
-          </button>
+          <!-- Days selector -->
+          <div class="flex items-center gap-1 bg-gray-100 dark:bg-white/5 rounded-lg p-1">
+            <button
+              v-for="d in daysOptions"
+              :key="d"
+              @click="days = d"
+              class="px-3 py-1.5 rounded-md text-xs font-semibold transition-colors"
+              :class="
+                days === d
+                  ? 'bg-white dark:bg-white/10 text-[#0F172A] dark:text-white shadow-sm'
+                  : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+              "
+            >
+              {{ d }}d
+            </button>
+          </div>
         </div>
       </div>
 
@@ -201,6 +204,66 @@
         </div>
       </div>
 
+      <!-- Agent Workload table -->
+      <div
+        v-if="data?.agentWorkload?.length"
+        class="bg-white dark:bg-[#1A1D2E] rounded-xl shadow-sm border border-gray-100 dark:border-white/[0.05] overflow-hidden mb-6"
+      >
+        <div class="px-5 py-4 border-b border-gray-100 dark:border-white/[0.06]">
+          <h3 class="font-semibold text-[#0F172A] dark:text-white text-sm">
+            Agent Workload
+          </h3>
+          <p class="text-xs text-gray-400 mt-0.5">
+            Active tickets per agent (last {{ days }} days)
+          </p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-gray-50 dark:bg-white/[0.03]">
+                <th
+                  class="text-left px-5 py-3 text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider"
+                >
+                  Agent
+                </th>
+                <th
+                  class="text-left px-5 py-3 text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider"
+                >
+                  Active Tickets
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-white/[0.04]">
+              <tr
+                v-for="a in data.agentWorkload"
+                :key="a.agentId"
+                class="hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors"
+              >
+                <td
+                  class="px-5 py-3.5 text-[13px] text-[#0F172A] dark:text-gray-300 font-medium"
+                >
+                  {{ a.agentName }}
+                </td>
+                <td class="px-5 py-3.5">
+                  <span
+                    class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold"
+                    :class="
+                      a.activeTickets > 5
+                        ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                        : a.activeTickets > 2
+                        ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                        : 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400'
+                    "
+                  >
+                    {{ a.activeTickets }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- Recent tickets table -->
       <TicketTable
         title="Recent Tickets"
@@ -214,7 +277,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import {
   Chart as ChartJS,
@@ -242,8 +305,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   AlertCircle,
-  CalendarDays,
-  Download,
   PlusCircle,
   CheckCircle,
   MessageSquare,
@@ -293,12 +354,14 @@ const ticketColumns = [
 const loading = ref(true);
 const error = ref("");
 const data = ref(null);
+const days = ref(30);
+const daysOptions = [7, 14, 30];
 
 async function fetchData() {
   loading.value = true;
   error.value = "";
   try {
-    const res = await api.get("/dashboard/admin");
+    const res = await api.get("/dashboard/admin", { params: { days: days.value } });
     data.value = res.data;
   } catch (e) {
     error.value =
@@ -309,6 +372,7 @@ async function fetchData() {
 }
 
 onMounted(fetchData);
+watch(days, fetchData);
 
 const processedTickets = computed(() =>
   (data.value?.recentTickets ?? []).map((t) => ({

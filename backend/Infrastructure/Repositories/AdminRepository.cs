@@ -44,6 +44,15 @@ namespace backend.Infrastructure.Repositories
         public async Task<List<Department>> GetAllDepartmentsAsync() =>
             await _context.Departments.OrderBy(d => d.Name).ToListAsync();
 
+        public async Task<string?> GetRoleNameAsync(int roleId) =>
+            await _context.Roles
+                .Where(r => r.Id == roleId)
+                .Select(r => r.Name)
+                .FirstOrDefaultAsync();
+
+        public async Task<Department?> GetDepartmentAsync(int deptId) =>
+            await _context.Departments.FindAsync(deptId);
+
         // AnyAsync checks — never load collections
         public async Task<bool> HasCreatedTicketsAsync(int userId) =>
             await _context.Tickets.AnyAsync(t => t.CreatedByUserId == userId);

@@ -11,6 +11,8 @@ namespace backend.Application.Interfaces
         Task<bool>             DepartmentExistsAsync(int deptId);
         Task<List<Role>>       GetAllRolesAsync();
         Task<List<Department>> GetAllDepartmentsAsync();
+        Task<string?>          GetRoleNameAsync(int roleId);
+        Task<Department?>      GetDepartmentAsync(int deptId);
 
         // AnyAsync existence checks — never load full collections into memory
         Task<bool> HasCreatedTicketsAsync(int userId);

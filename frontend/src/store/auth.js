@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import api from "../api/axios";
+import { useNotificationStore } from "./notification";
 
 export const useAuthStore = defineStore("auth", {
   state: () => ({
@@ -18,19 +19,20 @@ export const useAuthStore = defineStore("auth", {
       const response = await api.post("/auth/login", { email, password });
       const data = response.data;
 
-      // Save token and user to localStorage
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data));
 
-      // Save to store state
       this.token = data.token;
       this.user = data;
+
+      useNotificationStore().connectToHub();
 
       return data.role;
     },
 
     logout() {
-      // Clear everything
+      useNotificationStore().disconnect();
+
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       this.token = null;
