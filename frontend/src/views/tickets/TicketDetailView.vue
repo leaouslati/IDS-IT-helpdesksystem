@@ -518,7 +518,7 @@
                 (ticket.attachments || []).length
               }}</span>
             </h3>
-            <AttachmentList :attachments="ticket.attachments || []" />
+            <AttachmentList :attachments="ticket.attachments || []" :ticketId="ticket.id" />
           </div>
         </div>
       </div>

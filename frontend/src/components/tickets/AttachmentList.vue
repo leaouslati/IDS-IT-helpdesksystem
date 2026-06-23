@@ -7,13 +7,9 @@
       No attachments
     </div>
 
-    <a
+    <div
       v-for="att in attachments"
       :key="att.id"
-      :href="fileUrl(att)"
-      :download="att.fileName"
-      target="_blank"
-      rel="noopener noreferrer"
       class="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-white/[0.06] bg-gray-50/50 dark:bg-white/[0.02] hover:bg-gray-100 dark:hover:bg-white/[0.05] transition-all group"
     >
       <!-- Icon -->
@@ -42,16 +38,41 @@
         </p>
       </div>
 
-      <!-- Download arrow -->
-      <Download
-        :size="14"
-        class="text-gray-300 dark:text-gray-600 flex-shrink-0 group-hover:text-[#14B8A6] transition-colors"
-      />
-    </a>
+      <!-- Actions -->
+      <div class="flex items-center gap-1 flex-shrink-0">
+        <!-- Preview button (images + PDF only) -->
+        <button
+          v-if="canPreview(att.fileName)"
+          @click="openPreview(att)"
+          class="p-1.5 rounded-lg text-gray-300 dark:text-gray-600 hover:text-[#14B8A6] hover:bg-[#14B8A6]/10 transition-colors"
+          title="Preview"
+        >
+          <Eye :size="14" />
+        </button>
+
+        <!-- Download button -->
+        <button
+          @click="downloadFile(att)"
+          class="p-1.5 rounded-lg text-gray-300 dark:text-gray-600 hover:text-[#14B8A6] hover:bg-[#14B8A6]/10 transition-colors"
+          title="Download"
+        >
+          <Download :size="14" />
+        </button>
+      </div>
+    </div>
+
+    <!-- Preview modal -->
+    <AttachmentPreviewModal
+      :open="previewOpen"
+      :attachment="previewAttachment"
+      :ticketId="ticketId"
+      @close="previewOpen = false"
+    />
   </div>
 </template>
 
 <script setup>
+import { ref } from "vue";
 import {
   FileImage,
   FileText,
@@ -59,21 +80,54 @@ import {
   Archive,
   Download,
   FileCode,
+  Eye,
 } from "lucide-vue-next";
-import { API_ORIGIN } from "../../api/axios";
+import api from "../../api/axios";
+import AttachmentPreviewModal from "./AttachmentPreviewModal.vue";
 
-defineProps({
+const props = defineProps({
   attachments: { type: Array, default: () => [] },
+  ticketId: { type: Number, default: null },
 });
 
-function fileUrl(att) {
+const previewOpen = ref(false);
+const previewAttachment = ref(null);
+
+function openPreview(att) {
+  previewAttachment.value = att;
+  previewOpen.value = true;
+}
+
+async function downloadFile(att) {
+  if (props.ticketId && att.id) {
+    try {
+      const res = await api.get(
+        `/ticket/${props.ticketId}/attachments/${att.id}/download`,
+        { responseType: "blob" }
+      );
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = att.fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+      return;
+    } catch {
+      // fall through to direct URL fallback
+    }
+  }
+  // Fallback: direct URL
   const path = att.filePath || att.fileUrl || "";
-  if (!path) return "#";
-  return path.startsWith("http") ? path : `${API_ORIGIN}${path}`;
+  if (path) window.open(path.startsWith("http") ? path : `https://localhost:7091${path}`, "_blank");
 }
 
 function ext(fileName) {
   return (fileName || "").split(".").pop().toLowerCase();
+}
+
+function canPreview(fileName) {
+  const e = ext(fileName);
+  return ["jpg", "jpeg", "png", "gif", "webp", "svg", "pdf"].includes(e);
 }
 
 function fileIcon(fileName) {

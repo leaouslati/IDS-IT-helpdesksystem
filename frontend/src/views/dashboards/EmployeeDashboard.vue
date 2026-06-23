@@ -2,7 +2,6 @@
   <AppLayout
     :navLinks="navLinks"
     pageTitle="Dashboard"
-    :notificationCount="unreadCount"
     :showCreateTicket="false"
   >
     <!-- Loading -->
@@ -203,10 +202,6 @@ async function fetchData() {
 }
 
 onMounted(fetchData);
-
-const unreadCount = computed(
-  () => data.value?.myNotifications?.filter((n) => !n.isRead).length ?? 0
-);
 
 const quickLinks = [
   {

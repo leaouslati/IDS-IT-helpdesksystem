@@ -89,7 +89,7 @@
           <Menu :size="20" />
         </button>
 
-        <!-- Title + greeting -->
+        <!-- Title -->
         <div class="flex-1 min-w-0">
           <h2
             class="font-bold text-[#0F172A] dark:text-white text-[15px] leading-none truncate"
@@ -100,18 +100,138 @@
 
         <!-- Right actions -->
         <div class="flex items-center gap-1">
-          <button
-            class="relative p-2 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-colors"
-            title="Notifications"
-          >
-            <Bell :size="17" />
-            <span
-              v-if="notificationCount > 0"
-              class="absolute top-1 right-1 min-w-[16px] h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-[3px] leading-none"
+          <!-- Notification bell + dropdown -->
+          <div ref="notifRef" class="relative">
+            <button
+              @click="toggleNotif"
+              class="relative p-2 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-colors"
+              title="Notifications"
             >
-              {{ notificationCount > 9 ? "9+" : notificationCount }}
-            </span>
-          </button>
+              <Bell :size="17" />
+              <span
+                v-if="notifStore.unreadCount > 0"
+                class="absolute top-1 right-1 min-w-[16px] h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-[3px] leading-none"
+              >
+                {{ notifStore.unreadCount > 9 ? "9+" : notifStore.unreadCount }}
+              </span>
+            </button>
+
+            <!-- Dropdown panel -->
+            <Transition name="dropdown">
+              <div
+                v-if="notifOpen"
+                class="absolute right-0 top-full mt-2 w-[340px] bg-white dark:bg-[#1A1D2E] rounded-xl shadow-xl border border-gray-100 dark:border-white/[0.08] overflow-hidden z-50"
+              >
+                <!-- Header -->
+                <div
+                  class="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-white/[0.06]"
+                >
+                  <span
+                    class="text-[13px] font-semibold text-[#0F172A] dark:text-white"
+                    >Notifications</span
+                  >
+                  <button
+                    v-if="notifStore.unreadCount > 0"
+                    @click="notifStore.markAllAsRead()"
+                    class="text-[11px] text-[#14B8A6] font-semibold hover:text-teal-600 transition-colors"
+                  >
+                    Mark all read
+                  </button>
+                </div>
+
+                <!-- Notification items -->
+                <div
+                  class="divide-y divide-gray-100 dark:divide-white/[0.04] max-h-[320px] overflow-y-auto"
+                >
+                  <!-- No notifications at all -->
+                  <div
+                    v-if="!notifStore.notifications.length"
+                    class="py-10 text-center text-sm text-gray-400 dark:text-gray-500"
+                  >
+                    No notifications yet
+                  </div>
+
+                  <!-- All caught up — nothing unread -->
+                  <div
+                    v-else-if="notifStore.unreadCount === 0"
+                    class="py-9 flex flex-col items-center gap-2 px-4"
+                  >
+                    <div
+                      class="w-10 h-10 rounded-full bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center"
+                    >
+                      <CheckCheck
+                        :size="18"
+                        class="text-teal-600 dark:text-teal-400"
+                      />
+                    </div>
+                    <p
+                      class="text-[13px] font-semibold text-[#0F172A] dark:text-white"
+                    >
+                      All caught up!
+                    </p>
+                    <p class="text-[11px] text-gray-400">
+                      You've read all your notifications
+                    </p>
+                  </div>
+
+                  <!-- Unread notifications -->
+                  <template v-else>
+                    <div
+                      v-for="n in notifStore.notifications.slice(0, 5)"
+                      :key="n.id"
+                      @click="handleNotifClick(n)"
+                      class="flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors"
+                      :class="!n.isRead ? 'bg-teal-50/40 dark:bg-teal-900/5' : ''"
+                    >
+                      <div
+                        class="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                        :class="notifIconBg(n.type)"
+                      >
+                        <component
+                          :is="notifIcon(n.type)"
+                          :size="13"
+                          :class="notifIconColor(n.type)"
+                        />
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <p
+                          class="text-[12px] font-semibold text-[#0F172A] dark:text-white leading-snug truncate"
+                        >
+                          {{ n.title }}
+                        </p>
+                        <p
+                          class="text-[11px] text-gray-400 mt-0.5 leading-snug line-clamp-2"
+                        >
+                          {{ n.message }}
+                        </p>
+                        <p class="text-[10px] text-gray-400 mt-1">
+                          {{ timeAgo(n.createdAt) }}
+                        </p>
+                      </div>
+                      <div
+                        v-if="!n.isRead"
+                        class="w-2 h-2 rounded-full bg-[#14B8A6] flex-shrink-0 mt-2"
+                      />
+                    </div>
+                  </template>
+                </div>
+
+                <!-- Footer -->
+                <div
+                  class="px-4 py-3 border-t border-gray-100 dark:border-white/[0.06]"
+                >
+                  <router-link
+                    to="/notifications"
+                    @click="notifOpen = false"
+                    class="text-[12px] font-semibold text-[#14B8A6] hover:text-teal-600 transition-colors flex items-center justify-center gap-1"
+                  >
+                    View all notifications
+                    <ChevronRight :size="12" />
+                  </router-link>
+                </div>
+              </div>
+            </Transition>
+          </div>
 
           <button
             @click="toggleDark"
@@ -160,9 +280,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from "../../store/auth";
+import { useNotificationStore } from "../../store/notification";
 import {
   Headphones,
   PlusCircle,
@@ -171,6 +292,14 @@ import {
   Bell,
   Sun,
   Moon,
+  FileText,
+  UserCheck,
+  AlertTriangle,
+  CheckCircle2,
+  MessageSquare,
+  Paperclip,
+  ChevronRight,
+  CheckCheck,
 } from "lucide-vue-next";
 
 defineProps({
@@ -182,6 +311,7 @@ defineProps({
 const router = useRouter();
 const route = useRoute();
 const authStore = useAuthStore();
+const notifStore = useNotificationStore();
 
 const showCreateTicket = computed(() =>
   ["Employee", "Manager"].includes(authStore.userRole)
@@ -189,6 +319,8 @@ const showCreateTicket = computed(() =>
 
 const sidebarOpen = ref(false);
 const isDark = ref(false);
+const notifOpen = ref(false);
+const notifRef = ref(null);
 
 onMounted(() => {
   const saved = localStorage.getItem("theme");
@@ -200,7 +332,28 @@ onMounted(() => {
     isDark.value = window.matchMedia("(prefers-color-scheme: dark)").matches;
   }
   document.documentElement.classList.toggle("dark", isDark.value);
+
+  notifStore.connectToHub();
+  document.addEventListener("click", onClickOutside, true);
 });
+
+onUnmounted(() => {
+  document.removeEventListener("click", onClickOutside, true);
+});
+
+function onClickOutside(e) {
+  if (notifRef.value && !notifRef.value.contains(e.target)) {
+    notifOpen.value = false;
+  }
+}
+
+function toggleNotif() {
+  notifOpen.value = !notifOpen.value;
+  if (notifOpen.value) {
+    notifStore.fetchNotifications(1);
+    notifStore.fetchUnreadCount();
+  }
+}
 
 function toggleDark() {
   isDark.value = !isDark.value;
@@ -210,7 +363,6 @@ function toggleDark() {
 
 function isActive(path) {
   if (route.path === path) return true;
-  // match /tickets and all sub-routes (/tickets/create, /tickets/:id)
   if (path === "/tickets" && route.path.startsWith("/tickets")) return true;
   return false;
 }
@@ -224,6 +376,61 @@ function handleLogout() {
   authStore.logout();
   router.push("/login");
 }
+
+async function handleNotifClick(n) {
+  notifOpen.value = false;
+  if (!n.isRead) notifStore.markAsRead(n.id);
+  if (n.ticketId) router.push(`/tickets/${n.ticketId}`);
+  else router.push("/notifications");
+}
+
+function notifIcon(type) {
+  const map = {
+    TicketCreated: FileText,
+    TicketAssigned: UserCheck,
+    TicketEscalated: AlertTriangle,
+    TicketClosed: CheckCircle2,
+    CommentAdded: MessageSquare,
+    AttachmentAdded: Paperclip,
+  };
+  return map[type] || Bell;
+}
+
+function notifIconBg(type) {
+  const map = {
+    TicketCreated: "bg-blue-100 dark:bg-blue-900/30",
+    TicketAssigned: "bg-green-100 dark:bg-green-900/30",
+    TicketEscalated: "bg-orange-100 dark:bg-orange-900/30",
+    TicketClosed: "bg-teal-100 dark:bg-teal-900/30",
+    CommentAdded: "bg-blue-100 dark:bg-blue-900/30",
+    AttachmentAdded: "bg-purple-100 dark:bg-purple-900/30",
+  };
+  return map[type] || "bg-gray-100 dark:bg-white/5";
+}
+
+function notifIconColor(type) {
+  const map = {
+    TicketCreated: "text-blue-600 dark:text-blue-400",
+    TicketAssigned: "text-green-600 dark:text-green-400",
+    TicketEscalated: "text-orange-600 dark:text-orange-400",
+    TicketClosed: "text-teal-600 dark:text-teal-400",
+    CommentAdded: "text-blue-600 dark:text-blue-400",
+    AttachmentAdded: "text-purple-600 dark:text-purple-400",
+  };
+  return map[type] || "text-gray-500 dark:text-gray-400";
+}
+
+function timeAgo(dateStr) {
+  if (!dateStr) return "";
+  const normalized = /[Zz]|[+-]\d{2}:\d{2}$/.test(dateStr)
+    ? dateStr
+    : dateStr + "Z";
+  const diff = Math.floor((Date.now() - new Date(normalized).getTime()) / 1000);
+  if (diff < 60) return "Just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
 </script>
 
 <style scoped>
@@ -234,5 +441,15 @@ function handleLogout() {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 </style>

@@ -90,6 +90,12 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: "/notifications",
+    name: "Notifications",
+    component: () => import("../views/NotificationsView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
     path: "/knowledge-base",
     name: "KnowledgeBase",
     component: () => import("../views/KnowledgeBaseView.vue"),
