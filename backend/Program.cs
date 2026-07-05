@@ -1,3 +1,4 @@
+using backend.Application.Common;
 using backend.Application.Interfaces;
 using backend.Application.MappingProfiles;
 using backend.Application.Services;
@@ -9,7 +10,9 @@ using QuestPDF.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json.Serialization;
 
@@ -33,6 +36,16 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // ── AutoMapper ────────────────────────────────────────────────────────────────
 builder.Services.AddAutoMapper(cfg => cfg.AddMaps(typeof(TicketMappingProfile).Assembly));
+
+// ── Groq AI settings + HTTP client ─────────────────────────────────────────────
+builder.Services.Configure<GroqSettings>(builder.Configuration.GetSection("GroqSettings"));
+builder.Services.AddHttpClient("groq", (sp, client) =>
+{
+    var groqSettings = sp.GetRequiredService<IOptions<GroqSettings>>().Value;
+    client.BaseAddress = new Uri(groqSettings.BaseUrl.TrimEnd('/') + "/");
+    client.DefaultRequestHeaders.Authorization =
+        new AuthenticationHeaderValue("Bearer", groqSettings.ApiKey);
+});
 
 // ── SignalR ───────────────────────────────────────────────────────────────────
 builder.Services.AddSignalR();
@@ -66,6 +79,7 @@ builder.Services.AddScoped<IPdfReportService,      PdfReportService>();
 builder.Services.AddScoped<IExcelReportService,    ExcelReportService>();
 builder.Services.AddScoped<IProfileService,        ProfileService>();
 builder.Services.AddScoped<IHolidayService,        HolidayService>();
+builder.Services.AddScoped<IGroqService,           GroqService>();
 
 // ── JWT Authentication ────────────────────────────────────────────────────────
 // ── QuestPDF community license ────────────────────────────────────────────────
