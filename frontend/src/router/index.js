@@ -90,6 +90,12 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: "/reports",
+    name: "Reports",
+    component: () => import("../views/ReportsView.vue"),
+    meta: { requiresAuth: true, roles: ["Admin", "Manager"] },
+  },
+  {
     path: "/notifications",
     name: "Notifications",
     component: () => import("../views/NotificationsView.vue"),
@@ -100,6 +106,18 @@ const routes = [
     name: "KnowledgeBase",
     component: () => import("../views/KnowledgeBaseView.vue"),
     meta: { requiresAuth: true },
+  },
+  {
+    path: "/profile",
+    name: "Profile",
+    component: () => import("../views/ProfileView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/admin/system",
+    name: "AdminSystem",
+    component: () => import("../views/admin/SystemView.vue"),
+    meta: { requiresAuth: true, roles: ["Admin"] },
   },
   {
     path: "/unauthorized",

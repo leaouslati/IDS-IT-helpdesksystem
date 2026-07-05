@@ -11,5 +11,6 @@ namespace backend.Application.Interfaces
         Task<(bool success, string? error)>      UpdateUserRoleAsync(int userId, UpdateUserRoleDto dto, int adminId);
         Task<IEnumerable<RoleLookupDto>>         GetRolesAsync();
         Task<IEnumerable<DepartmentLookupDto>>   GetDepartmentsAsync();
+        Task<SystemInfoDto>                      GetSystemInfoAsync();
     }
 }

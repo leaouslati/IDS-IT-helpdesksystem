@@ -5,6 +5,7 @@ using backend.Infrastructure.Data;
 using backend.Infrastructure.Repositories;
 using backend.Infrastructure.Services;
 using backend.Presentation.Hubs;
+using QuestPDF.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -46,6 +47,9 @@ builder.Services.AddScoped<ILookupRepository,         LookupRepository>();
 builder.Services.AddScoped<IDashboardRepository,      DashboardRepository>();
 builder.Services.AddScoped<IAdminRepository,          AdminRepository>();
 builder.Services.AddScoped<INotificationRepository,   NotificationRepository>();
+builder.Services.AddScoped<IReportRepository,         ReportRepository>();
+builder.Services.AddScoped<IProfileRepository,        ProfileRepository>();
+builder.Services.AddScoped<IHolidayRepository,        HolidayRepository>();
 
 // ── Service registrations ─────────────────────────────────────────────────────
 builder.Services.AddScoped<IAuthService,           AuthService>();
@@ -57,8 +61,16 @@ builder.Services.AddScoped<IAdminService,          AdminService>();
 builder.Services.AddScoped<INotificationService,   NotificationService>();
 builder.Services.AddScoped<IFileStorageService,    FileStorageService>();
 builder.Services.AddSingleton<IEmailService,       EmailService>();
+builder.Services.AddScoped<IReportService,         ReportService>();
+builder.Services.AddScoped<IPdfReportService,      PdfReportService>();
+builder.Services.AddScoped<IExcelReportService,    ExcelReportService>();
+builder.Services.AddScoped<IProfileService,        ProfileService>();
+builder.Services.AddScoped<IHolidayService,        HolidayService>();
 
 // ── JWT Authentication ────────────────────────────────────────────────────────
+// ── QuestPDF community license ────────────────────────────────────────────────
+QuestPDF.Settings.License = LicenseType.Community;
+
 var jwtKey      = builder.Configuration["Jwt:Key"]!;
 var jwtIssuer   = builder.Configuration["Jwt:Issuer"]!;
 var jwtAudience = builder.Configuration["Jwt:Audience"]!;
@@ -232,6 +244,29 @@ using (var scope = app.Services.CreateScope())
     db.Database.ExecuteSqlRaw(@"
         IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('TicketComments') AND name = 'IsAttachmentOnly')
         ALTER TABLE TicketComments ADD IsAttachmentOnly bit NOT NULL DEFAULT 0");
+
+    // ── Week 6 schema additions ────────────────────────────────────────────
+
+    // TicketComments: internal notes visible to Agent/Admin only
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('TicketComments') AND name = 'IsInternal')
+        ALTER TABLE TicketComments ADD IsInternal bit NOT NULL DEFAULT 0");
+
+    // Users: profile picture path
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Users') AND name = 'ProfilePictureUrl')
+        ALTER TABLE Users ADD ProfilePictureUrl nvarchar(300) NULL");
+
+    // Holidays: admin-managed holiday calendar
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Holidays')
+        CREATE TABLE Holidays (
+            Id int NOT NULL IDENTITY PRIMARY KEY,
+            Name nvarchar(100) NOT NULL,
+            Date datetime2 NOT NULL,
+            IsRecurring bit NOT NULL DEFAULT 0,
+            CreatedAt datetime2 NOT NULL DEFAULT GETUTCDATE()
+        )");
 
     await DbSeeder.SeedAsync(db);
 }

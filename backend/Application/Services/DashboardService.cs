@@ -16,7 +16,6 @@ namespace backend.Application.Services
         {
             var today      = DateTime.UtcNow.Date;
             var windowStart = DateTime.UtcNow.AddDays(-days);
-            var sevenDaysAgo = today.AddDays(-6);
 
             var openTickets       = await _repo.CountTicketsByStatusNameAsync("Open", windowStart);
             var pendingTickets    = await _repo.CountTicketsByStatusNameAsync("Pending", windowStart);
@@ -26,7 +25,7 @@ namespace backend.Application.Services
             var activeUsers       = await _repo.CountUsersAsync(true);
             var totalTickets      = await _repo.CountAllTicketsAsync(windowStart);
             var escalatedTickets  = await _repo.CountEscalatedTicketsAsync(windowStart);
-            var ticketTrend       = await _repo.GetTicketTrendAsync(sevenDaysAgo);
+            var ticketTrend       = await _repo.GetTicketTrendAsync(days);
             var categoryBreakdown = await _repo.GetCategoryBreakdownAsync(null, windowStart);
             var priorityBreakdown = await _repo.GetPriorityBreakdownAsync(null, windowStart);
             var recentActivity    = await _repo.GetRecentActivityAsync(take: 10);

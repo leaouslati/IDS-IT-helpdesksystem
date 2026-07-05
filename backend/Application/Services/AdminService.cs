@@ -1,16 +1,28 @@
 using backend.Application.DTOs;
 using backend.Application.Interfaces;
 using backend.Domain.Entities;
+using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
 
 namespace backend.Application.Services
 {
     public class AdminService : IAdminService
     {
-        private readonly IAdminRepository _repo;
+        private readonly IAdminRepository     _repo;
+        private readonly IDashboardRepository _dashboardRepo;
+        private readonly IFileStorageService  _fileStorage;
+        private readonly IConfiguration       _configuration;
 
-        public AdminService(IAdminRepository repo)
+        public AdminService(
+            IAdminRepository repo,
+            IDashboardRepository dashboardRepo,
+            IFileStorageService fileStorage,
+            IConfiguration configuration)
         {
-            _repo = repo;
+            _repo          = repo;
+            _dashboardRepo = dashboardRepo;
+            _fileStorage   = fileStorage;
+            _configuration = configuration;
         }
 
         public async Task<IEnumerable<UserListDto>> GetAllUsersAsync()
@@ -150,6 +162,31 @@ namespace backend.Application.Services
         {
             var depts = await _repo.GetAllDepartmentsAsync();
             return depts.Select(d => new DepartmentLookupDto { Id = d.Id, Name = d.Name });
+        }
+
+        public async Task<SystemInfoDto> GetSystemInfoAsync()
+        {
+            var users      = await _repo.GetAllUsersWithDetailsAsync();
+            var roleCounts = users.GroupBy(u => u.Role.Name).ToDictionary(g => g.Key, g => g.Count());
+
+            var connectionString = _configuration.GetConnectionString("DefaultConnection") ?? string.Empty;
+            var databaseName = new SqlConnectionStringBuilder(connectionString).InitialCatalog;
+
+            var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0";
+
+            return new SystemInfoDto
+            {
+                AdminCount       = roleCounts.GetValueOrDefault("Admin"),
+                ManagerCount     = roleCounts.GetValueOrDefault("Manager"),
+                AgentCount       = roleCounts.GetValueOrDefault("Agent"),
+                EmployeeCount    = roleCounts.GetValueOrDefault("Employee"),
+                TotalUsers       = users.Count,
+                TotalTickets     = await _dashboardRepo.CountAllTicketsAsync(),
+                StorageUsedBytes = _fileStorage.GetTotalStorageUsedBytes(),
+                AppVersion       = version,
+                DatabaseName     = databaseName,
+                ServerTimeUtc    = DateTime.UtcNow
+            };
         }
 
         private static UserListDto ToDto(User u) => new()

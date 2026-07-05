@@ -6,6 +6,7 @@ export const useAuthStore = defineStore("auth", {
   state: () => ({
     token: localStorage.getItem("token") || null,
     user: JSON.parse(localStorage.getItem("user")) || null,
+    avatarUrl: null,
   }),
 
   getters: {
@@ -37,6 +38,23 @@ export const useAuthStore = defineStore("auth", {
       localStorage.removeItem("user");
       this.token = null;
       this.user = null;
+      this.clearAvatar();
+    },
+
+    // Keeps navbar/sidebar in sync immediately after a profile edit, without a re-login
+    updateUserInfo({ firstName, lastName, email }) {
+      this.user = { ...this.user, firstName, lastName, email };
+      localStorage.setItem("user", JSON.stringify(this.user));
+    },
+
+    setAvatar(objectUrl) {
+      if (this.avatarUrl) URL.revokeObjectURL(this.avatarUrl);
+      this.avatarUrl = objectUrl;
+    },
+
+    clearAvatar() {
+      if (this.avatarUrl) URL.revokeObjectURL(this.avatarUrl);
+      this.avatarUrl = null;
     },
   },
 });

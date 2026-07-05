@@ -53,17 +53,19 @@ namespace backend.Infrastructure.Repositories
             return await q.CountAsync();
         }
 
-        public async Task<List<TicketTrendDto>> GetTicketTrendAsync(DateTime from)
+        public async Task<List<TicketTrendDto>> GetTicketTrendAsync(int days)
         {
-            var today = DateTime.UtcNow.Date;
+            var today    = DateTime.UtcNow.Date;
+            var fromDate = today.AddDays(-(days - 1)); // exactly `days` points, ending today
+
             var raw = await _context.Tickets
-                .Where(t => t.CreatedAt >= from ||
-                    (t.UpdatedAt.HasValue && t.UpdatedAt.Value >= from && t.TicketStatus.Name == "Resolved"))
+                .Where(t => t.CreatedAt >= fromDate ||
+                    (t.UpdatedAt.HasValue && t.UpdatedAt.Value >= fromDate && t.TicketStatus.Name == "Resolved"))
                 .Select(t => new { t.CreatedAt, t.UpdatedAt, StatusName = t.TicketStatus.Name })
                 .ToListAsync();
 
-            return Enumerable.Range(0, 7)
-                .Select(i => today.AddDays(i - 6))
+            return Enumerable.Range(0, days)
+                .Select(i => fromDate.AddDays(i))
                 .Select(date => new TicketTrendDto
                 {
                     Date     = date.ToString("MMM dd"),

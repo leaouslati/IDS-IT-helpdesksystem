@@ -10,4 +10,7 @@ export const lookupApi = {
   getStatuses() {
     return api.get("/lookup/statuses");
   },
+  getDepartments() {
+    return api.get("/lookup/departments");
+  },
 };

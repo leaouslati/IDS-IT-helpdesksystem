@@ -1,4 +1,5 @@
 using AutoMapper;
+using backend.Application.Common;
 using backend.Application.DTOs;
 using backend.Application.Interfaces;
 using backend.Domain.Entities;
@@ -14,24 +15,6 @@ namespace backend.Application.Services
         private readonly INotificationService   _notifications;
         private readonly IMapper                _mapper;
         private readonly int                    _maxFileSizeBytes;
-
-        // ── Allowed extensions (server-side allow-list) ───────────────────────
-        private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
-        {
-            // Images
-            ".png", ".jpg", ".jpeg", ".gif", ".webp",
-            // Documents
-            ".pdf", ".docx", ".doc", ".xlsx", ".xls", ".pptx", ".ppt", ".txt", ".csv",
-            // Logs
-            ".log"
-        };
-
-        // ── Explicitly blocked extensions ─────────────────────────────────────
-        private static readonly HashSet<string> BlockedExtensions = new(StringComparer.OrdinalIgnoreCase)
-        {
-            ".exe", ".php", ".sh", ".bat", ".cmd", ".js", ".vbs", ".ps1",
-            ".dll", ".msi", ".jar", ".py", ".asp", ".aspx", ".jsp"
-        };
 
         public TicketService(
             ITicketRepository repo,
@@ -93,6 +76,9 @@ namespace backend.Application.Services
             }
 
             var comments    = await _repo.GetCommentsWithUserAndRoleAsync(ticketId);
+            var visibleComments = role is "Employee" or "Manager"
+                ? comments.Where(c => !c.IsInternal).ToList()
+                : comments;
             var attachments = await _repo.GetAttachmentsWithUploaderAsync(ticketId);
             var totalHours  = await _repo.GetTotalHoursForTicketAsync(ticketId);
 
@@ -164,7 +150,7 @@ namespace backend.Application.Services
                 CanLogHours      = canLogHours,
                 EscalationReason = canSeeEscalationHistory ? escalationReason : null,
                 TotalHoursWorked = totalHours,
-                Comments         = _mapper.Map<List<TicketCommentDto>>(comments),
+                Comments         = _mapper.Map<List<TicketCommentDto>>(visibleComments),
                 Attachments      = _mapper.Map<List<TicketAttachmentDto>>(attachments),
                 ActivityLog      = _mapper.Map<List<TicketActivityLogDto>>(activityLogs)
             };
@@ -234,6 +220,16 @@ namespace backend.Application.Services
             }
 
             var result = await GetTicketByIdAsync(ticket.Id, userId, "Employee");
+
+            // Notify all admins when a Critical ticket is submitted
+            if (result?.Priority == "Critical")
+            {
+                await _notifications.NotifyAdminsAsync(
+                    type:    NotificationType.CriticalTicket,
+                    title:   $"Critical Ticket: {ticket.ReferenceNumber}",
+                    message: $"A Critical priority ticket was just submitted: \"{ticket.Title}\" — requires immediate attention.");
+            }
+
             return (result, null);
         }
 
@@ -503,6 +499,12 @@ namespace backend.Application.Services
                 }
             }
 
+            // Also notify all admins so they have system-wide visibility of escalations
+            await _notifications.NotifyAdminsAsync(
+                type:    NotificationType.EscalationAlert,
+                title:   $"Escalation: {ticket.ReferenceNumber}",
+                message: $"Ticket {ticket.ReferenceNumber} \"{ticket.Title}\" has been escalated.");
+
             return (true, null);
         }
 
@@ -513,6 +515,9 @@ namespace backend.Application.Services
         {
             if (string.IsNullOrWhiteSpace(dto.Content))
                 return (null, "Comment content is required.");
+
+            if (dto.IsInternal && role != "Agent" && role != "Admin")
+                return (null, "Only Agents and Admins can create internal notes.");
 
             var ticket = await _repo.GetTicketWithStatusAsync(ticketId);
             if (ticket == null) return (null, "Ticket not found.");
@@ -537,24 +542,43 @@ namespace backend.Application.Services
                 UserId              = userId,
                 Content             = dto.Content.Trim(),
                 IsEscalationComment = false,
+                IsInternal          = dto.IsInternal,
                 CreatedAt           = DateTime.UtcNow
             };
 
             _repo.AddComment(comment);
 
+            var user = await _repo.GetUserWithRoleAsync(userId);
+            var userName = user != null ? user.FirstName + " " + user.LastName : "Unknown";
+
             _repo.AddActivityLog(new ActivityLog
             {
                 UserId   = userId,
                 TicketId = ticketId,
-                Action   = "Comment Added",
-                Details  = $"Comment added to ticket {ticket.ReferenceNumber}",
+                Action   = dto.IsInternal ? "Internal note added" : "Comment Added",
+                Details  = dto.IsInternal
+                    ? $"Internal note added by {userName}"
+                    : $"Comment added to ticket {ticket.ReferenceNumber}",
                 LoggedAt = DateTime.UtcNow
             });
 
             await _repo.SaveChangesAsync();
 
             // Notify all ticket participants except the commenter (bell only)
+            // Internal notes are not surfaced to Employees/Managers, so skip notifications for them
             var participants = await _repo.GetTicketParticipantIdsAsync(ticketId, userId);
+            if (dto.IsInternal)
+            {
+                var visibleRoleIds = new List<int>();
+                foreach (var pid in participants)
+                {
+                    var pUser = await _repo.GetUserWithRoleAsync(pid);
+                    if (pUser?.Role?.Name is "Agent" or "Admin")
+                        visibleRoleIds.Add(pid);
+                }
+                participants = visibleRoleIds;
+            }
+
             if (participants.Count > 0)
             {
                 await _notifications.NotifyAsync(
@@ -563,21 +587,22 @@ namespace backend.Application.Services
                     ticketRef:      ticket.ReferenceNumber,
                     ticketTitle:    ticket.Title,
                     recipientUserIds: participants,
-                    message:        $"A new comment was added to ticket {ticket.ReferenceNumber} \"{ticket.Title}\".",
+                    message:        dto.IsInternal
+                        ? $"A new internal note was added to ticket {ticket.ReferenceNumber} \"{ticket.Title}\"."
+                        : $"A new comment was added to ticket {ticket.ReferenceNumber} \"{ticket.Title}\".",
                     sendEmail:      false);
             }
 
-            var user = await _repo.GetUserWithRoleAsync(userId);
             return (new TicketCommentDto
             {
                 Id                  = comment.Id,
                 UserId              = comment.UserId,
-                UserName            = user != null ? user.FirstName + " " + user.LastName : "Unknown",
+                UserName            = userName,
                 UserRole            = user?.Role?.Name ?? string.Empty,
                 Content             = comment.Content,
                 IsEscalationComment = comment.IsEscalationComment,
                 IsAttachmentOnly    = false,
-                IsInternal          = false,
+                IsInternal          = comment.IsInternal,
                 CreatedAt           = comment.CreatedAt
             }, null);
         }
@@ -601,6 +626,9 @@ namespace backend.Application.Services
             }
 
             var comments = await _repo.GetCommentsWithUserAndRoleAsync(ticketId);
+            if (role is "Employee" or "Manager")
+                comments = comments.Where(c => !c.IsInternal).ToList();
+
             return _mapper.Map<List<TicketCommentDto>>(comments);
         }
 
@@ -619,11 +647,11 @@ namespace backend.Application.Services
             // ── Extension validation ──────────────────────────────────────────
             var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
 
-            if (BlockedExtensions.Contains(ext))
+            if (FileValidationRules.BlockedExtensions.Contains(ext))
                 return (null, $"File type '{ext}' is explicitly blocked for security reasons.");
 
-            if (!AllowedExtensions.Contains(ext))
-                return (null, $"File type '{ext}' is not allowed. Allowed: {string.Join(", ", AllowedExtensions.OrderBy(e => e))}");
+            if (!FileValidationRules.AllowedExtensions.Contains(ext))
+                return (null, $"File type '{ext}' is not allowed. Allowed: {string.Join(", ", FileValidationRules.AllowedExtensions.OrderBy(e => e))}");
 
             // ── Size validation ───────────────────────────────────────────────
             if (file.Length > _maxFileSizeBytes)
@@ -633,7 +661,7 @@ namespace backend.Application.Services
             await using var peekStream = file.OpenReadStream();
             var header = new byte[8];
             var read   = await peekStream.ReadAsync(header.AsMemory(0, header.Length));
-            if (HasForbiddenMagicBytes(header, read))
+            if (FileValidationRules.HasForbiddenMagicBytes(header, read))
                 return (null, "File content does not match the declared file type. Executable content is not allowed.");
 
             // ── Ticket access validation ──────────────────────────────────────
@@ -813,35 +841,5 @@ namespace backend.Application.Services
             return (result, null);
         }
 
-        // ── HELPERS ───────────────────────────────────────────────────────────
-
-        /// <summary>
-        /// Returns true when the file's magic bytes reveal it is a forbidden executable type,
-        /// regardless of what extension the client declared.
-        /// </summary>
-        private static bool HasForbiddenMagicBytes(byte[] header, int bytesRead)
-        {
-            if (bytesRead < 2) return false;
-
-            // MZ signature — Windows executables: EXE, DLL, COM, etc.
-            if (header[0] == 0x4D && header[1] == 0x5A)
-                return true;
-
-            if (bytesRead < 4) return false;
-
-            // ELF signature — Linux / Unix executables
-            if (header[0] == 0x7F && header[1] == 0x45 && header[2] == 0x4C && header[3] == 0x46)
-                return true;
-
-            // Mach-O thin binary — macOS executables (big-endian)
-            if (header[0] == 0xFE && header[1] == 0xED && header[2] == 0xFA && header[3] == 0xCE)
-                return true;
-
-            // Mach-O thin binary — macOS executables (little-endian)
-            if (header[0] == 0xCE && header[1] == 0xFA && header[2] == 0xED && header[3] == 0xFE)
-                return true;
-
-            return false;
-        }
     }
 }

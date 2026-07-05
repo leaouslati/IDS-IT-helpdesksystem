@@ -20,5 +20,8 @@ namespace backend.Application.Services
 
         public Task<IEnumerable<TicketStatusDto>> GetStatusesAsync() =>
             _repo.GetStatusesAsync();
+
+        public Task<IEnumerable<DepartmentLookupDto>> GetDepartmentsAsync() =>
+            _repo.GetDepartmentsAsync();
     }
 }

@@ -146,10 +146,6 @@
 import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import {
-  LayoutDashboard,
-  FileText,
-  Bell,
-  User,
   Inbox,
   Clock,
   TrendingUp,
@@ -163,15 +159,11 @@ import AppLayout from "../../components/layout/AppLayout.vue";
 import StatCard from "../../components/dashboard/StatCard.vue";
 import TicketTable from "../../components/dashboard/TicketTable.vue";
 import api from "../../api/axios";
+import { getNavLinks } from "../../config/navLinks";
 
 const router = useRouter();
 
-const navLinks = [
-  { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard/agent" },
-  { icon: FileText, label: "My Tickets", to: "/tickets" },
-  { icon: Bell, label: "Notifications", to: "/notifications" },
-  { icon: User, label: "Profile", to: "/profile" },
-];
+const navLinks = getNavLinks("Agent");
 
 const quickActions = [
   {
@@ -221,7 +213,7 @@ const days = ref(30);
 const daysOptions = [7, 14, 30];
 
 async function fetchData() {
-  loading.value = true;
+  if (!data.value) loading.value = true;
   error.value = "";
   try {
     const res = await api.get("/dashboard/agent", { params: { days: days.value } });

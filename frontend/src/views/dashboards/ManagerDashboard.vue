@@ -420,11 +420,6 @@ import {
 } from "chart.js";
 import { Bar } from "vue-chartjs";
 import {
-  LayoutDashboard,
-  FileText,
-  BarChart2,
-  Bell,
-  User,
   Inbox,
   Clock,
   CheckCircle2,
@@ -438,6 +433,7 @@ import StatCard from "../../components/dashboard/StatCard.vue";
 import TicketTable from "../../components/dashboard/TicketTable.vue";
 import { useAuthStore } from "../../store/auth";
 import api from "../../api/axios";
+import { getNavLinks } from "../../config/navLinks";
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -451,13 +447,7 @@ ChartJS.register(
   Legend
 );
 
-const navLinks = [
-  { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard/manager" },
-  { icon: FileText, label: "All Tickets", to: "/tickets" },
-  { icon: BarChart2, label: "Reports", to: "/reports" },
-  { icon: Bell, label: "Notifications", to: "/notifications" },
-  { icon: User, label: "Profile", to: "/profile" },
-];
+const navLinks = getNavLinks("Manager");
 
 const ticketColumns = [
   { key: "referenceNumber", label: "Ref#" },
@@ -494,7 +484,7 @@ const days = ref(30);
 const daysOptions = [7, 14, 30];
 
 async function fetchData() {
-  loading.value = true;
+  if (!data.value) loading.value = true;
   error.value = "";
   try {
     const res = await api.get("/dashboard/manager", { params: { days: days.value } });

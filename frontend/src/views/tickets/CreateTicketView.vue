@@ -239,7 +239,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import {
   ArrowLeft,
@@ -249,25 +249,17 @@ import {
   Paperclip,
   X,
   Send,
-  LayoutDashboard,
-  FileText,
-  Bell,
-  User,
-  BarChart2,
-  Settings,
-  Users,
 } from "lucide-vue-next";
 import AppLayout from "../../components/layout/AppLayout.vue";
 import RichTextEditor from "../../components/ui/RichTextEditor.vue";
 import LoadingSpinner from "../../components/ui/LoadingSpinner.vue";
 import { useTicketStore } from "../../store/ticket";
-import { useAuthStore } from "../../store/auth";
 import { useToastStore } from "../../store/toast";
 import { ticketApi } from "../../api/ticketApi";
+import { useNavLinks } from "../../composables/useNavLinks";
 
 const router = useRouter();
 const ticketStore = useTicketStore();
-const authStore = useAuthStore();
 const toastStore = useToastStore();
 
 const descEditor = ref(null);
@@ -284,34 +276,7 @@ const form = ref({
 });
 const errors = ref({});
 
-const role = computed(() => authStore.userRole);
-
-const navLinks = computed(() => {
-  const map = {
-    Admin: [
-      { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard/admin" },
-      { icon: FileText, label: "Tickets", to: "/tickets" },
-      { icon: Users, label: "Users", to: "/users" },
-      { icon: BarChart2, label: "Reports", to: "/reports" },
-      { icon: Settings, label: "Settings", to: "/settings" },
-      { icon: User, label: "Profile", to: "/profile" },
-    ],
-    Manager: [
-      { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard/manager" },
-      { icon: FileText, label: "All Tickets", to: "/tickets" },
-      { icon: BarChart2, label: "Reports", to: "/reports" },
-      { icon: Bell, label: "Notifications", to: "/notifications" },
-      { icon: User, label: "Profile", to: "/profile" },
-    ],
-    Employee: [
-      { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard/employee" },
-      { icon: FileText, label: "My Tickets", to: "/tickets" },
-      { icon: Bell, label: "Notifications", to: "/notifications" },
-      { icon: User, label: "Profile", to: "/profile" },
-    ],
-  };
-  return map[role.value] || map.Employee;
-});
+const { navLinks } = useNavLinks();
 
 onMounted(() => ticketStore.fetchLookups());
 

@@ -11,7 +11,8 @@ namespace backend.Application.Interfaces
         Task<Notification?> FindByIdAsync(int id);
         Task MarkReadAsync(int notificationId);
         Task MarkAllReadAsync(int userId);
-        Task<List<(int UserId, string Email)>> GetUserEmailsAsync(IEnumerable<int> userIds);
+        Task<List<(int UserId, string Email, string Name)>> GetUserEmailsAsync(IEnumerable<int> userIds);
+        Task<List<int>> GetAdminUserIdsAsync();
         Task SaveChangesAsync();
     }
 }

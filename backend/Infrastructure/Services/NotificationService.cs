@@ -85,30 +85,71 @@ namespace backend.Infrastructure.Services
             {
                 var userEmails = await _repo.GetUserEmailsAsync(recipients);
                 var appBase    = _config["AppBaseUrl"] ?? "http://localhost:8080";
-                _ = SendEmailsAsync(userEmails, appBase, ticketId, ticketTitle, message);
+                _ = SendEmailsAsync(userEmails, appBase, ticketId, ticketRef, ticketTitle, message);
             }
         }
 
         private async Task SendEmailsAsync(
-            List<(int UserId, string Email)> userEmails,
+            List<(int UserId, string Email, string Name)> userEmails,
             string appBase,
             int ticketId,
+            string ticketRef,
             string ticketTitle,
             string message)
         {
-            foreach (var (_, email) in userEmails)
+            foreach (var (_, email, name) in userEmails)
             {
                 if (string.IsNullOrWhiteSpace(email)) continue;
 
                 var body = EmailService.BuildTicketEmailBody(
-                    recipientName:    email,
+                    recipientName:    name,
                     eventDescription: message,
-                    ticketRef:        "(see ticket)",
+                    ticketRef:        ticketRef,
                     ticketTitle:      ticketTitle,
                     appBaseUrl:       appBase,
                     ticketId:         ticketId);
 
-                await _email.SendEmailAsync(email, $"[IT Help Desk] {ticketTitle}", body);
+                await _email.SendEmailAsync(email, $"[IT Help Desk] {ticketRef}: {ticketTitle}", body);
+            }
+        }
+
+        public async Task NotifyAdminsAsync(string type, string title, string message)
+        {
+            var adminIds = await _repo.GetAdminUserIdsAsync();
+            if (adminIds.Count == 0) return;
+
+            var now   = DateTime.UtcNow;
+            var saved = new List<Notification>(adminIds.Count);
+            foreach (var userId in adminIds)
+            {
+                var n = new Notification
+                {
+                    UserId    = userId,
+                    TicketId  = null,
+                    Type      = type,
+                    Title     = title,
+                    Message   = message,
+                    IsRead    = false,
+                    CreatedAt = now
+                };
+                await _repo.AddAsync(n);
+                saved.Add(n);
+            }
+            await _repo.SaveChangesAsync();
+
+            foreach (var n in saved)
+            {
+                _ = _hub.Clients.User(n.UserId.ToString())
+                    .SendAsync("ReceiveNotification", new NotificationDto
+                    {
+                        Id        = n.Id,
+                        TicketId  = null,
+                        Type      = type,
+                        Title     = title,
+                        Message   = message,
+                        IsRead    = false,
+                        CreatedAt = now
+                    });
             }
         }
 

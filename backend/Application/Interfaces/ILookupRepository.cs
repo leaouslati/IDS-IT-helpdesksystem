@@ -7,5 +7,6 @@ namespace backend.Application.Interfaces
         Task<IEnumerable<CategoryDto>> GetCategoriesAsync();
         Task<IEnumerable<PriorityDto>> GetPrioritiesAsync();
         Task<IEnumerable<TicketStatusDto>> GetStatusesAsync();
+        Task<IEnumerable<DepartmentLookupDto>> GetDepartmentsAsync();
     }
 }

@@ -8,4 +8,5 @@ export const adminApi = {
   deleteUser: (id) => api.delete(`/admin/users/${id}`),
   getRoles: () => api.get("/admin/roles"),
   getDepartments: () => api.get("/admin/departments"),
+  getSystemInfo: () => api.get("/admin/system-info"),
 };

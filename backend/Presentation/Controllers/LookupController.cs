@@ -36,5 +36,12 @@ namespace backend.Presentation.Controllers
         {
             return Ok(await _lookupService.GetStatusesAsync());
         }
+
+        // ── GET /api/lookup/departments ────────────────────────────────────────
+        [HttpGet("departments")]
+        public async Task<IActionResult> GetDepartments()
+        {
+            return Ok(await _lookupService.GetDepartmentsAsync());
+        }
     }
 }

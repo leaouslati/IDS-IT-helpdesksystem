@@ -6,6 +6,8 @@ namespace backend.Infrastructure.Services
     public class FileStorageService : IFileStorageService
     {
         private readonly string _rootPath;
+        private readonly string _uploadsRoot;
+        private readonly string _profilesRoot;
         private readonly string _wwwrootPath;
 
         private static readonly Dictionary<string, string> MimeTypes =
@@ -30,9 +32,12 @@ namespace backend.Infrastructure.Services
 
         public FileStorageService(IWebHostEnvironment env)
         {
-            _rootPath    = Path.Combine(env.ContentRootPath, "App_Data", "uploads", "tickets");
-            _wwwrootPath = env.WebRootPath ?? Path.Combine(env.ContentRootPath, "wwwroot");
+            _uploadsRoot  = Path.Combine(env.ContentRootPath, "App_Data", "uploads");
+            _rootPath     = Path.Combine(_uploadsRoot, "tickets");
+            _profilesRoot = Path.Combine(_uploadsRoot, "profiles");
+            _wwwrootPath  = env.WebRootPath ?? Path.Combine(env.ContentRootPath, "wwwroot");
             Directory.CreateDirectory(_rootPath);
+            Directory.CreateDirectory(_profilesRoot);
         }
 
         public async Task<(string storedFileName, string virtualPath)> SaveFileAsync(
@@ -84,6 +89,53 @@ namespace backend.Infrastructure.Services
             if (string.IsNullOrEmpty(storedFileName)) return;
             var path = Path.Combine(_rootPath, ticketId.ToString(), storedFileName);
             if (File.Exists(path)) File.Delete(path);
+        }
+
+        public async Task<(string storedFileName, string virtualPath)> SaveProfilePictureAsync(
+            Stream stream, int userId, string originalFileName, string extension)
+        {
+            var dir = Path.Combine(_profilesRoot, userId.ToString());
+            Directory.CreateDirectory(dir);
+
+            var storedFileName = $"{Guid.NewGuid()}{extension}";
+            var physicalPath    = Path.Combine(dir, storedFileName);
+
+            await using var fs = new FileStream(physicalPath, FileMode.Create);
+            await stream.CopyToAsync(fs);
+
+            var virtualPath = $"/uploads/profiles/{userId}/{storedFileName}";
+            return (storedFileName, virtualPath);
+        }
+
+        public async Task<(Stream? stream, string contentType)> GetProfilePictureStreamAsync(string storedFileName, int userId)
+        {
+            if (string.IsNullOrEmpty(storedFileName)) return (null, string.Empty);
+
+            var path = Path.Combine(_profilesRoot, userId.ToString(), storedFileName);
+            if (!File.Exists(path)) return (null, string.Empty);
+
+            var ext         = Path.GetExtension(storedFileName);
+            var contentType = MimeTypes.GetValueOrDefault(ext, "application/octet-stream");
+            await Task.CompletedTask;
+            return (new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read), contentType);
+        }
+
+        public void DeleteProfilePicture(string storedFileName, int userId)
+        {
+            if (string.IsNullOrEmpty(storedFileName)) return;
+            var path = Path.Combine(_profilesRoot, userId.ToString(), storedFileName);
+            if (File.Exists(path)) File.Delete(path);
+        }
+
+        public long GetTotalStorageUsedBytes()
+        {
+            if (!Directory.Exists(_uploadsRoot)) return 0;
+
+            long total = 0;
+            foreach (var file in Directory.EnumerateFiles(_uploadsRoot, "*", SearchOption.AllDirectories))
+                total += new FileInfo(file).Length;
+
+            return total;
         }
     }
 }

@@ -34,6 +34,7 @@ namespace backend.Application.DTOs
     public class AddCommentDto
     {
         public string Content { get; set; } = string.Empty;
+        public bool IsInternal { get; set; } = false;
     }
 
     public class TicketSummaryDto

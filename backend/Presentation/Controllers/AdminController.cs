@@ -85,5 +85,13 @@ namespace backend.Presentation.Controllers
             var depts = await _adminService.GetDepartmentsAsync();
             return Ok(depts);
         }
+
+        // ── GET /api/admin/system-info ────────────────────────────────────────
+        [HttpGet("system-info")]
+        public async Task<IActionResult> GetSystemInfo()
+        {
+            var info = await _adminService.GetSystemInfoAsync();
+            return Ok(info);
+        }
     }
 }
