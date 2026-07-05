@@ -278,7 +278,7 @@ Once the backend is running, a full interactive Swagger UI is available at `/swa
 - File storage is local to the server — for production, a cloud storage service like Azure Blob Storage would be more appropriate
 - No email-to-ticket automation yet (creating a ticket by sending an email)
 - No mobile app — the system is responsive but web-only
-- No dark mode yet
+- No AI ChatBot yet
 
 ---
 
