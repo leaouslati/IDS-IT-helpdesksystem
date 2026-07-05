@@ -11,16 +11,18 @@ namespace backend.Application.Services
 {
     public class AuthService : IAuthService
     {
-        private readonly IAuthRepository _repo;
-        private readonly IConfiguration  _configuration;
+        private readonly IAuthRepository      _repo;
+        private readonly IConfiguration       _configuration;
+        private readonly INotificationService _notifications;
 
         private const int MaxFailedAttempts = 5;
         private const int LockoutMinutes    = 15;
 
-        public AuthService(IAuthRepository repo, IConfiguration configuration)
+        public AuthService(IAuthRepository repo, IConfiguration configuration, INotificationService notifications)
         {
             _repo          = repo;
             _configuration = configuration;
+            _notifications = notifications;
         }
 
         public async Task<AuthLoginResult> LoginAsync(LoginRequestDto request)
@@ -54,6 +56,14 @@ namespace backend.Application.Services
                     user.LockoutUntil        = DateTime.UtcNow.AddMinutes(LockoutMinutes);
                     user.FailedLoginAttempts = 0;
                     await _repo.SaveChangesAsync();
+
+                    // Notify all admins about the lockout
+                    var lockedName = $"{user.FirstName} {user.LastName}";
+                    await _notifications.NotifyAdminsAsync(
+                        type:    NotificationType.AccountLocked,
+                        title:   "Account Locked Out",
+                        message: $"\"{lockedName}\" ({user.Email}) was locked out after {MaxFailedAttempts} failed login attempts.");
+
                     return new AuthLoginResult { ErrorCode = "ACCOUNT_LOCKED", MinutesRemaining = LockoutMinutes };
                 }
 

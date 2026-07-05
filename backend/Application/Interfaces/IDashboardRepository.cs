@@ -14,7 +14,7 @@ namespace backend.Application.Interfaces
         Task<int> CountUsersAsync(bool? isActive = null);
         Task<int> CountAllTicketsAsync(DateTime? since = null);
         Task<int> CountEscalatedTicketsAsync(DateTime? since = null);
-        Task<List<TicketTrendDto>> GetTicketTrendAsync(DateTime from);
+        Task<List<TicketTrendDto>> GetTicketTrendAsync(int days);
         Task<List<CategoryBreakdownDto>> GetCategoryBreakdownAsync(int? deptId = null, DateTime? since = null);
         Task<List<PriorityBreakdownDto>> GetPriorityBreakdownAsync(int? deptId = null, DateTime? since = null);
         Task<List<RecentActivityDto>> GetRecentActivityAsync(int? userId = null, int take = 10);

@@ -174,14 +174,13 @@
                     </p>
                   </div>
 
-                  <!-- Unread notifications -->
+                  <!-- Unread notifications only -->
                   <template v-else>
                     <div
-                      v-for="n in notifStore.notifications.slice(0, 5)"
+                      v-for="n in notifStore.notifications.filter(n => !n.isRead).slice(0, 5)"
                       :key="n.id"
                       @click="handleNotifClick(n)"
-                      class="flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors"
-                      :class="!n.isRead ? 'bg-teal-50/40 dark:bg-teal-900/5' : ''"
+                      class="flex items-start gap-3 px-4 py-3 cursor-pointer bg-teal-50/40 dark:bg-teal-900/5 hover:bg-teal-50 dark:hover:bg-teal-900/10 transition-colors"
                     >
                       <div
                         class="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
@@ -208,10 +207,7 @@
                           {{ timeAgo(n.createdAt) }}
                         </p>
                       </div>
-                      <div
-                        v-if="!n.isRead"
-                        class="w-2 h-2 rounded-full bg-[#14B8A6] flex-shrink-0 mt-2"
-                      />
+                      <div class="w-2 h-2 rounded-full bg-[#14B8A6] flex-shrink-0 mt-2" />
                     </div>
                   </template>
                 </div>
@@ -246,13 +242,21 @@
           <div
             class="flex items-center gap-2.5 pl-3 ml-1 border-l border-gray-200 dark:border-white/[0.08]"
           >
-            <div
-              class="w-[34px] h-[34px] rounded-full bg-[#14B8A6]/20 flex items-center justify-center flex-shrink-0 ring-2 ring-[#14B8A6]/30"
+            <router-link
+              to="/profile"
+              class="w-[34px] h-[34px] rounded-full bg-[#14B8A6]/20 flex items-center justify-center flex-shrink-0 ring-2 ring-[#14B8A6]/30 overflow-hidden"
+              title="My Profile"
             >
-              <span class="text-[#14B8A6] font-bold text-xs">{{
+              <img
+                v-if="authStore.avatarUrl"
+                :src="authStore.avatarUrl"
+                alt="Profile"
+                class="w-full h-full object-cover"
+              />
+              <span v-else class="text-[#14B8A6] font-bold text-xs">{{
                 userInitials
               }}</span>
-            </div>
+            </router-link>
             <div class="hidden md:block leading-tight">
               <p
                 class="text-[13px] font-semibold text-[#0F172A] dark:text-white leading-none mb-0.5"
@@ -284,6 +288,7 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from "../../store/auth";
 import { useNotificationStore } from "../../store/notification";
+import { profileApi } from "../../api/profileApi";
 import {
   Headphones,
   PlusCircle,
@@ -335,6 +340,15 @@ onMounted(() => {
 
   notifStore.connectToHub();
   document.addEventListener("click", onClickOutside, true);
+
+  if (!authStore.avatarUrl) {
+    profileApi
+      .getPictureBlob()
+      .then((res) => authStore.setAvatar(URL.createObjectURL(res.data)))
+      .catch(() => {
+        // No profile picture set — fall back to initials
+      });
+  }
 });
 
 onUnmounted(() => {
@@ -349,10 +363,6 @@ function onClickOutside(e) {
 
 function toggleNotif() {
   notifOpen.value = !notifOpen.value;
-  if (notifOpen.value) {
-    notifStore.fetchNotifications(1);
-    notifStore.fetchUnreadCount();
-  }
 }
 
 function toggleDark() {

@@ -20,6 +20,7 @@ namespace backend.Infrastructure.Data
         public DbSet<ActivityLog> ActivityLogs { get; set; }
         public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
         public DbSet<TicketHoursLog> TicketHoursLogs { get; set; }
+        public DbSet<Holiday> Holidays { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

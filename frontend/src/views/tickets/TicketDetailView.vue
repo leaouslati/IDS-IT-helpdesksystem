@@ -402,7 +402,7 @@
             v-if="ticket.status !== 'Resolved'"
             :ticket-id="ticketId"
             :can-mark-internal="
-              ['Agent', 'Manager', 'Admin'].includes(authStore.userRole)
+              ['Agent', 'Admin'].includes(authStore.userRole)
             "
             @comment-added="onCommentAdded"
           />
@@ -453,7 +453,7 @@
                   </p>
                 </div>
                 <button
-                  v-if="ticket.canAssign"
+                  v-if="ticket.canAssign && role !== 'Admin'"
                   @click="openAssignModal"
                   class="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#14B8A6] text-white hover:bg-teal-600 transition-colors shadow-sm"
                 >
@@ -864,13 +864,6 @@ import {
   Lock,
   AlertCircle,
   UserCheck,
-  LayoutDashboard,
-  FileText,
-  Bell,
-  User,
-  Users,
-  BarChart2,
-  Settings,
   X,
   Clock,
   Flame,
@@ -893,6 +886,7 @@ import { useTicketStore } from "../../store/ticket";
 import { useAuthStore } from "../../store/auth";
 import { useToastStore } from "../../store/toast";
 import { ticketApi } from "../../api/ticketApi";
+import { useNavLinks } from "../../composables/useNavLinks";
 
 const route = useRoute();
 const router = useRouter();
@@ -947,38 +941,7 @@ const escalateCharCount = computed(
 
 const role = computed(() => authStore.userRole);
 
-const navLinks = computed(() => {
-  const map = {
-    Admin: [
-      { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard/admin" },
-      { icon: FileText, label: "All Tickets", to: "/tickets" },
-      { icon: Users, label: "Users", to: "/admin/users" },
-      { icon: BarChart2, label: "Reports", to: "/reports" },
-      { icon: Settings, label: "Settings", to: "/settings" },
-      { icon: User, label: "Profile", to: "/profile" },
-    ],
-    Manager: [
-      { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard/manager" },
-      { icon: FileText, label: "All Tickets", to: "/tickets" },
-      { icon: BarChart2, label: "Reports", to: "/reports" },
-      { icon: Bell, label: "Notifications", to: "/notifications" },
-      { icon: User, label: "Profile", to: "/profile" },
-    ],
-    Agent: [
-      { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard/agent" },
-      { icon: FileText, label: "My Tickets", to: "/tickets" },
-      { icon: Bell, label: "Notifications", to: "/notifications" },
-      { icon: User, label: "Profile", to: "/profile" },
-    ],
-    Employee: [
-      { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard/employee" },
-      { icon: FileText, label: "My Tickets", to: "/tickets" },
-      { icon: Bell, label: "Notifications", to: "/notifications" },
-      { icon: User, label: "Profile", to: "/profile" },
-    ],
-  };
-  return map[role.value] || map.Employee;
-});
+const { navLinks } = useNavLinks();
 
 const availableStatuses = computed(() => ticketStore.statuses);
 

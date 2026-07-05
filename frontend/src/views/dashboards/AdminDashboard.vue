@@ -50,7 +50,6 @@
           </p>
         </div>
         <div class="flex items-center gap-2 flex-shrink-0">
-          <!-- Days selector -->
           <div class="flex items-center gap-1 bg-gray-100 dark:bg-white/5 rounded-lg p-1">
             <button
               v-for="d in daysOptions"
@@ -109,17 +108,15 @@
                 Ticket Trend
               </h3>
               <p class="text-xs text-gray-400 mt-0.5">
-                Created vs resolved over last 7 days
+                Created vs resolved over last {{ days }} days
               </p>
             </div>
-            <span
-              class="text-xs text-gray-400 bg-gray-100 dark:bg-white/5 px-2.5 py-1 rounded-full"
-            >
-              7 days
+            <span class="text-xs text-gray-400 bg-gray-100 dark:bg-white/5 px-2.5 py-1 rounded-full">
+              {{ days }} days
             </span>
           </div>
           <div style="position: relative; height: 210px">
-            <Line :data="lineChartData" :options="lineChartOptions" />
+            <Line :key="days" :data="lineChartData" :options="lineChartOptions" />
           </div>
         </div>
 
@@ -133,8 +130,12 @@
             </h3>
             <p class="text-xs text-gray-400 mt-0.5">Tickets by category</p>
           </div>
-          <div style="position: relative; height: 240px">
+          <div v-if="data?.categoryBreakdown?.length" style="position: relative; height: 240px">
             <Bar :data="categoryBarData" :options="categoryBarOptions" />
+          </div>
+          <div v-else class="flex flex-col items-center justify-center h-[240px] gap-2">
+            <BarChart2 :size="32" class="text-gray-200 dark:text-gray-700" />
+            <p class="text-sm text-gray-400 dark:text-gray-500">No ticket data for this period</p>
           </div>
         </div>
       </div>
@@ -198,8 +199,12 @@
             </h3>
             <p class="text-xs text-gray-400 mt-0.5">Priority distribution</p>
           </div>
-          <div style="position: relative; height: 240px">
+          <div v-if="data?.priorityBreakdown?.length" style="position: relative; height: 240px">
             <Doughnut :data="priorityDoughnutData" :options="doughnutOptions" />
+          </div>
+          <div v-else class="flex flex-col items-center justify-center h-[240px] gap-2">
+            <PieChart :size="32" class="text-gray-200 dark:text-gray-700" />
+            <p class="text-sm text-gray-400 dark:text-gray-500">No ticket data for this period</p>
           </div>
         </div>
       </div>
@@ -294,13 +299,9 @@ import {
 } from "chart.js";
 import { Line, Bar, Doughnut } from "vue-chartjs";
 import {
-  LayoutDashboard,
-  FileText,
   FileStack,
-  Users,
   BarChart2,
-  Settings,
-  User,
+  PieChart,
   Inbox,
   CheckCircle2,
   AlertTriangle,
@@ -310,11 +311,14 @@ import {
   MessageSquare,
   UserCheck,
   Activity,
+  Users,
 } from "lucide-vue-next";
 import AppLayout from "../../components/layout/AppLayout.vue";
 import StatCard from "../../components/dashboard/StatCard.vue";
 import TicketTable from "../../components/dashboard/TicketTable.vue";
+import { getNavLinks } from "../../config/navLinks";
 import api from "../../api/axios";
+
 
 const router = useRouter();
 
@@ -331,14 +335,7 @@ ChartJS.register(
   Filler
 );
 
-const navLinks = [
-  { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard/admin" },
-  { icon: FileText, label: "All Tickets", to: "/tickets" },
-  { icon: Users, label: "Users", to: "/admin/users" },
-  { icon: BarChart2, label: "Reports", to: "/reports" },
-  { icon: Settings, label: "Settings", to: "/settings" },
-  { icon: User, label: "Profile", to: "/profile" },
-];
+const navLinks = getNavLinks("Admin");
 
 const ticketColumns = [
   { key: "referenceNumber", label: "Ref#" },
@@ -358,7 +355,7 @@ const days = ref(30);
 const daysOptions = [7, 14, 30];
 
 async function fetchData() {
-  loading.value = true;
+  if (!data.value) loading.value = true;
   error.value = "";
   try {
     const res = await api.get("/dashboard/admin", { params: { days: days.value } });

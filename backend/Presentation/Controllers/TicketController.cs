@@ -117,7 +117,12 @@ namespace backend.Presentation.Controllers
         public async Task<IActionResult> AddComment(int ticketId, [FromBody] AddCommentDto dto)
         {
             var (comment, error) = await _ticketService.AddCommentAsync(ticketId, dto, CurrentUserId, CurrentRole);
-            if (error != null) return ServiceError(error);
+            if (error != null)
+            {
+                if (error.Contains("Only Agents and Admins", StringComparison.OrdinalIgnoreCase))
+                    return StatusCode(403, new { message = error });
+                return ServiceError(error);
+            }
             return CreatedAtAction(nameof(GetTicketById), new { id = ticketId }, comment);
         }
 

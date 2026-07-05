@@ -184,13 +184,8 @@
 
 <script setup>
 import { ref, computed } from "vue";
-import { useAuthStore } from "../store/auth";
+import { useNavLinks } from "../composables/useNavLinks";
 import {
-  LayoutDashboard,
-  FileText,
-  Bell,
-  User,
-  BookOpen,
   Search,
   ArrowRight,
   X,
@@ -204,40 +199,7 @@ import {
 } from "lucide-vue-next";
 import AppLayout from "../components/layout/AppLayout.vue";
 
-const authStore = useAuthStore();
-const role = computed(() => authStore.userRole);
-
-const navLinks = computed(() => {
-  const map = {
-    Employee: [
-      { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard/employee" },
-      { icon: FileText, label: "My Tickets", to: "/tickets" },
-      { icon: Bell, label: "Notifications", to: "/notifications" },
-      { icon: User, label: "Profile", to: "/profile" },
-    ],
-    Agent: [
-      { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard/agent" },
-      { icon: FileText, label: "My Tickets", to: "/tickets" },
-      { icon: BookOpen, label: "Knowledge Base", to: "/knowledge-base" },
-      { icon: Bell, label: "Notifications", to: "/notifications" },
-      { icon: User, label: "Profile", to: "/profile" },
-    ],
-    Manager: [
-      { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard/manager" },
-      { icon: FileText, label: "All Tickets", to: "/tickets" },
-      { icon: BookOpen, label: "Knowledge Base", to: "/knowledge-base" },
-      { icon: Bell, label: "Notifications", to: "/notifications" },
-      { icon: User, label: "Profile", to: "/profile" },
-    ],
-    Admin: [
-      { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard/admin" },
-      { icon: FileText, label: "Tickets", to: "/tickets" },
-      { icon: BookOpen, label: "Knowledge Base", to: "/knowledge-base" },
-      { icon: User, label: "Profile", to: "/profile" },
-    ],
-  };
-  return map[role.value] ?? map.Employee;
-});
+const { navLinks } = useNavLinks();
 
 const search = ref("");
 const modalArticle = ref(null);

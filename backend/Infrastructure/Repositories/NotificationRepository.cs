@@ -62,14 +62,20 @@ namespace backend.Infrastructure.Repositories
                 .Where(n => n.UserId == userId && !n.IsRead)
                 .ExecuteUpdateAsync(s => s.SetProperty(n => n.IsRead, true));
 
-        public async Task<List<(int UserId, string Email)>> GetUserEmailsAsync(IEnumerable<int> userIds)
+        public async Task<List<int>> GetAdminUserIdsAsync() =>
+            await _context.Users
+                .Where(u => u.IsActive && u.Role.Name == "Admin")
+                .Select(u => u.Id)
+                .ToListAsync();
+
+        public async Task<List<(int UserId, string Email, string Name)>> GetUserEmailsAsync(IEnumerable<int> userIds)
         {
             var ids = userIds.ToList();
             return (await _context.Users
                 .Where(u => ids.Contains(u.Id) && u.IsActive)
-                .Select(u => new { u.Id, u.Email })
+                .Select(u => new { u.Id, u.Email, Name = u.FirstName + " " + u.LastName })
                 .ToListAsync())
-                .Select(u => (u.Id, u.Email))
+                .Select(u => (u.Id, u.Email, u.Name))
                 .ToList();
         }
 

@@ -190,25 +190,24 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import {
-  LayoutDashboard,
   FileText,
   Bell,
   BellOff,
-  User,
   UserCheck,
   AlertTriangle,
   CheckCircle2,
   MessageSquare,
   Paperclip,
   CheckCheck,
+  ShieldAlert,
+  Flame,
 } from "lucide-vue-next";
 import { useRouter } from "vue-router";
-import { useAuthStore } from "../store/auth";
 import { useNotificationStore } from "../store/notification";
 import AppLayout from "../components/layout/AppLayout.vue";
+import { useNavLinks } from "../composables/useNavLinks";
 
 const router = useRouter();
-const authStore = useAuthStore();
 const notifStore = useNotificationStore();
 
 const activeTab = ref("all");
@@ -218,23 +217,7 @@ const tabs = [
   { key: "unread", label: "Unread" },
 ];
 
-const navLinks = computed(() => {
-  const role = authStore.userRole;
-  const base = [
-    { icon: Bell, label: "Notifications", to: "/notifications" },
-    { icon: FileText, label: "My Tickets", to: "/tickets" },
-    { icon: User, label: "Profile", to: "/profile" },
-  ];
-  const dashRoute =
-    role === "Admin"
-      ? "/dashboard/admin"
-      : role === "Manager"
-      ? "/dashboard/manager"
-      : role === "Agent"
-      ? "/dashboard/agent"
-      : "/dashboard/employee";
-  return [{ icon: LayoutDashboard, label: "Dashboard", to: dashRoute }, ...base];
-});
+const { navLinks } = useNavLinks();
 
 const filteredNotifications = computed(() => {
   if (activeTab.value === "unread") {
@@ -290,36 +273,45 @@ async function handleClick(n) {
 
 function typeIcon(type) {
   const map = {
-    TicketCreated: FileText,
-    TicketAssigned: UserCheck,
+    TicketCreated:   FileText,
+    TicketAssigned:  UserCheck,
     TicketEscalated: AlertTriangle,
-    TicketClosed: CheckCircle2,
-    CommentAdded: MessageSquare,
+    TicketClosed:    CheckCircle2,
+    CommentAdded:    MessageSquare,
     AttachmentAdded: Paperclip,
+    CriticalTicket:  Flame,
+    EscalationAlert: AlertTriangle,
+    AccountLocked:   ShieldAlert,
   };
   return map[type] || Bell;
 }
 
 function iconBg(type) {
   const map = {
-    TicketCreated: "bg-blue-100 dark:bg-blue-900/30",
-    TicketAssigned: "bg-green-100 dark:bg-green-900/30",
+    TicketCreated:   "bg-blue-100 dark:bg-blue-900/30",
+    TicketAssigned:  "bg-green-100 dark:bg-green-900/30",
     TicketEscalated: "bg-orange-100 dark:bg-orange-900/30",
-    TicketClosed: "bg-teal-100 dark:bg-teal-900/30",
-    CommentAdded: "bg-blue-100 dark:bg-blue-900/30",
+    TicketClosed:    "bg-teal-100 dark:bg-teal-900/30",
+    CommentAdded:    "bg-blue-100 dark:bg-blue-900/30",
     AttachmentAdded: "bg-purple-100 dark:bg-purple-900/30",
+    CriticalTicket:  "bg-red-100 dark:bg-red-900/30",
+    EscalationAlert: "bg-orange-100 dark:bg-orange-900/30",
+    AccountLocked:   "bg-red-100 dark:bg-red-900/30",
   };
   return map[type] || "bg-gray-100 dark:bg-white/5";
 }
 
 function iconColor(type) {
   const map = {
-    TicketCreated: "text-blue-600 dark:text-blue-400",
-    TicketAssigned: "text-green-600 dark:text-green-400",
+    TicketCreated:   "text-blue-600 dark:text-blue-400",
+    TicketAssigned:  "text-green-600 dark:text-green-400",
     TicketEscalated: "text-orange-600 dark:text-orange-400",
-    TicketClosed: "text-teal-600 dark:text-teal-400",
-    CommentAdded: "text-blue-600 dark:text-blue-400",
+    TicketClosed:    "text-teal-600 dark:text-teal-400",
+    CommentAdded:    "text-blue-600 dark:text-blue-400",
     AttachmentAdded: "text-purple-600 dark:text-purple-400",
+    CriticalTicket:  "text-red-600 dark:text-red-400",
+    EscalationAlert: "text-orange-600 dark:text-orange-400",
+    AccountLocked:   "text-red-600 dark:text-red-400",
   };
   return map[type] || "text-gray-500 dark:text-gray-400";
 }

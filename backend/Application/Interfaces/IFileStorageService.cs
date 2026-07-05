@@ -15,5 +15,18 @@ namespace backend.Application.Interfaces
 
         /// <summary>Deletes the physical file from disk (no-op if missing).</summary>
         void DeleteFile(string storedFileName, int ticketId);
+
+        /// <summary>Saves a profile picture under profiles/{userId}/ and returns (storedFileName, virtualPath).</summary>
+        Task<(string storedFileName, string virtualPath)> SaveProfilePictureAsync(
+            Stream stream, int userId, string originalFileName, string extension);
+
+        /// <summary>Opens a read stream for a user's stored profile picture.</summary>
+        Task<(Stream? stream, string contentType)> GetProfilePictureStreamAsync(string storedFileName, int userId);
+
+        /// <summary>Deletes the physical profile picture file from disk (no-op if missing).</summary>
+        void DeleteProfilePicture(string storedFileName, int userId);
+
+        /// <summary>Total bytes used by all stored uploads (tickets + profiles).</summary>
+        long GetTotalStorageUsedBytes();
     }
 }

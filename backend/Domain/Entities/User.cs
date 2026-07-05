@@ -15,5 +15,6 @@ namespace backend.Domain.Entities
         public Department? Department { get; set; }
         public int FailedLoginAttempts { get; set; } = 0;
         public DateTime? LockoutUntil { get; set; }
+        public string? ProfilePictureUrl { get; set; }
     }
 }

@@ -222,19 +222,13 @@ import { useRouter } from "vue-router";
 import {
   Plus,
   AlertCircle,
-  LayoutDashboard,
-  FileText,
-  Bell,
-  User,
-  BarChart2,
-  Settings,
-  Users,
 } from "lucide-vue-next";
 import AppLayout from "../../components/layout/AppLayout.vue";
 import TicketFilters from "../../components/tickets/TicketFilters.vue";
 import TicketCard from "../../components/tickets/TicketCard.vue";
 import { useTicketStore } from "../../store/ticket";
 import { useAuthStore } from "../../store/auth";
+import { useNavLinks } from "../../composables/useNavLinks";
 
 const router = useRouter();
 const ticketStore = useTicketStore();
@@ -327,38 +321,7 @@ const displayedTickets = computed(() => {
   return filteredTickets.value;
 });
 
-const navLinks = computed(() => {
-  const map = {
-    Admin: [
-      { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard/admin" },
-      { icon: FileText, label: "All Tickets", to: "/tickets" },
-      { icon: Users, label: "Users", to: "/admin/users" },
-      { icon: BarChart2, label: "Reports", to: "/reports" },
-      { icon: Settings, label: "Settings", to: "/settings" },
-      { icon: User, label: "Profile", to: "/profile" },
-    ],
-    Manager: [
-      { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard/manager" },
-      { icon: FileText, label: "All Tickets", to: "/tickets" },
-      { icon: BarChart2, label: "Reports", to: "/reports" },
-      { icon: Bell, label: "Notifications", to: "/notifications" },
-      { icon: User, label: "Profile", to: "/profile" },
-    ],
-    Agent: [
-      { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard/agent" },
-      { icon: FileText, label: "My Tickets", to: "/tickets" },
-      { icon: Bell, label: "Notifications", to: "/notifications" },
-      { icon: User, label: "Profile", to: "/profile" },
-    ],
-    Employee: [
-      { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard/employee" },
-      { icon: FileText, label: "My Tickets", to: "/tickets" },
-      { icon: Bell, label: "Notifications", to: "/notifications" },
-      { icon: User, label: "Profile", to: "/profile" },
-    ],
-  };
-  return map[role.value] || map.Employee;
-});
+const { navLinks } = useNavLinks();
 
 onMounted(async () => {
   await Promise.all([ticketStore.fetchTickets(), ticketStore.fetchLookups()]);

@@ -32,5 +32,11 @@ namespace backend.Infrastructure.Repositories
                 .OrderBy(s => s.Id)
                 .Select(s => new TicketStatusDto { Id = s.Id, Name = s.Name })
                 .ToListAsync();
+
+        public async Task<IEnumerable<DepartmentLookupDto>> GetDepartmentsAsync() =>
+            await _context.Departments
+                .OrderBy(d => d.Name)
+                .Select(d => new DepartmentLookupDto { Id = d.Id, Name = d.Name })
+                .ToListAsync();
     }
 }

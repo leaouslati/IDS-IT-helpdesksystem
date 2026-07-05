@@ -45,13 +45,31 @@
             Dashboard
           </h1>
         </div>
-        <button
-          @click="router.push('/tickets/create')"
-          class="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 bg-[#14B8A6] text-white text-sm font-semibold rounded-lg hover:bg-teal-600 active:bg-teal-700 transition-colors shadow-sm"
-        >
-          <Plus :size="15" />
-          Create New Ticket
-        </button>
+        <div class="flex items-center gap-2">
+          <!-- Days selector -->
+          <div class="flex items-center gap-1 bg-gray-100 dark:bg-white/5 rounded-lg p-1">
+            <button
+              v-for="d in daysOptions"
+              :key="d"
+              @click="days = d"
+              class="px-3 py-1.5 rounded-md text-xs font-semibold transition-colors"
+              :class="
+                days === d
+                  ? 'bg-white dark:bg-white/10 text-[#0F172A] dark:text-white shadow-sm'
+                  : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+              "
+            >
+              {{ d }}d
+            </button>
+          </div>
+          <button
+            @click="router.push('/tickets/create')"
+            class="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 bg-[#14B8A6] text-white text-sm font-semibold rounded-lg hover:bg-teal-600 active:bg-teal-700 transition-colors shadow-sm"
+          >
+            <Plus :size="15" />
+            Create New Ticket
+          </button>
+        </div>
       </div>
 
       <!-- Stat cards -->
@@ -142,13 +160,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import {
-  LayoutDashboard,
-  FileText,
-  Bell,
-  User,
   Inbox,
   CheckCircle2,
   Clock,
@@ -163,15 +177,11 @@ import AppLayout from "../../components/layout/AppLayout.vue";
 import StatCard from "../../components/dashboard/StatCard.vue";
 import TicketTable from "../../components/dashboard/TicketTable.vue";
 import api from "../../api/axios";
+import { getNavLinks } from "../../config/navLinks";
 
 const router = useRouter();
 
-const navLinks = [
-  { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard/employee" },
-  { icon: FileText, label: "My Tickets", to: "/tickets" },
-  { icon: Bell, label: "Notifications", to: "/notifications" },
-  { icon: User, label: "Profile", to: "/profile" },
-];
+const navLinks = getNavLinks("Employee");
 
 const ticketColumns = [
   { key: "referenceNumber", label: "Ref#" },
@@ -186,12 +196,14 @@ const ticketColumns = [
 const loading = ref(true);
 const error = ref("");
 const data = ref(null);
+const days = ref(30);
+const daysOptions = [7, 14, 30];
 
 async function fetchData() {
-  loading.value = true;
+  if (!data.value) loading.value = true;
   error.value = "";
   try {
-    const res = await api.get("/dashboard/employee");
+    const res = await api.get("/dashboard/employee", { params: { days: days.value } });
     data.value = res.data;
   } catch (e) {
     error.value =
@@ -202,6 +214,7 @@ async function fetchData() {
 }
 
 onMounted(fetchData);
+watch(days, fetchData);
 
 const quickLinks = [
   {

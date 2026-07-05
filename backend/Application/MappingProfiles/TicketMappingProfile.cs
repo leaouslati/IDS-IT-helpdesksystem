@@ -12,8 +12,7 @@ namespace backend.Application.MappingProfiles
             // ThenInclude on c.User.Role is required to populate UserRole for chat-bubble alignment
             CreateMap<TicketComment, TicketCommentDto>()
                 .ForMember(d => d.UserName, o => o.MapFrom(s => s.User.FirstName + " " + s.User.LastName))
-                .ForMember(d => d.UserRole, o => o.MapFrom(s => s.User.Role != null ? s.User.Role.Name : string.Empty))
-                .ForMember(d => d.IsInternal, o => o.MapFrom(_ => false));
+                .ForMember(d => d.UserRole, o => o.MapFrom(s => s.User.Role != null ? s.User.Role.Name : string.Empty));
 
             // ActivityLog → TicketActivityLogDto
             CreateMap<ActivityLog, TicketActivityLogDto>()

@@ -591,13 +591,7 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import {
-  LayoutDashboard,
-  FileText,
-  Users,
-  User,
   UserPlus,
-  BarChart2,
-  Settings,
   Search,
   ShieldCheck,
   ToggleLeft,
@@ -611,17 +605,11 @@ import {
 import AppLayout from "../../components/layout/AppLayout.vue";
 import { adminApi } from "../../api/adminApi";
 import { useToastStore } from "../../store/toast";
+import { getNavLinks } from "../../config/navLinks";
 
 const toastStore = useToastStore();
 
-const navLinks = [
-  { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard/admin" },
-  { icon: FileText, label: "All Tickets", to: "/tickets" },
-  { icon: Users, label: "Users", to: "/admin/users" },
-  { icon: BarChart2, label: "Reports", to: "/reports" },
-  { icon: Settings, label: "Settings", to: "/settings" },
-  { icon: User, label: "Profile", to: "/profile" },
-];
+const navLinks = getNavLinks("Admin");
 
 // ── Data ────────────────────────────────────────────────────────────────────
 const users = ref([]);
