@@ -90,6 +90,13 @@
               class="text-xs text-red-500 mt-1 block"
               >{{ errors.categoryId }}</span
             >
+            <SuggestionChip
+              v-if="analysisResult?.suggestedCategory"
+              :value="analysisResult.suggestedCategory"
+              :confidence="analysisResult.categoryConfidence"
+              :applied="categoryApplied"
+              @apply="applyCategory"
+            />
           </div>
 
           <div>
@@ -127,6 +134,13 @@
               class="text-xs text-red-500 mt-1 block"
               >{{ errors.priorityId }}</span
             >
+            <SuggestionChip
+              v-if="analysisResult?.suggestedPriority"
+              :value="analysisResult.suggestedPriority"
+              :confidence="analysisResult.priorityConfidence"
+              :applied="priorityApplied"
+              @apply="applyPriority"
+            />
           </div>
         </div>
 
@@ -148,6 +162,25 @@
             class="text-xs text-red-500 mt-1 block"
             >{{ errors.description }}</span
           >
+
+          <div class="flex items-center gap-3 mt-2">
+            <button
+              type="button"
+              @click="runAnalysis"
+              :disabled="descriptionText.length < 10 || isAnalyzing"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-teal-200 dark:border-teal-800 text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 hover:bg-teal-100 dark:hover:bg-teal-900/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <span
+                v-if="isAnalyzing"
+                class="w-3 h-3 border-2 border-teal-600 border-t-transparent rounded-full animate-spin"
+              />
+              <Sparkles v-else :size="13" />
+              {{ isAnalyzing ? "Analyzing..." : "Analyze with AI" }}
+            </button>
+            <span v-if="analysisError" class="text-xs text-gray-400">{{
+              analysisError
+            }}</span>
+          </div>
         </div>
 
         <!-- Attachments -->
@@ -239,7 +272,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import {
   ArrowLeft,
@@ -249,14 +282,17 @@ import {
   Paperclip,
   X,
   Send,
+  Sparkles,
 } from "lucide-vue-next";
 import AppLayout from "../../components/layout/AppLayout.vue";
 import RichTextEditor from "../../components/ui/RichTextEditor.vue";
 import LoadingSpinner from "../../components/ui/LoadingSpinner.vue";
+import SuggestionChip from "../../components/tickets/SuggestionChip.vue";
 import { useTicketStore } from "../../store/ticket";
 import { useToastStore } from "../../store/toast";
 import { ticketApi } from "../../api/ticketApi";
 import { useNavLinks } from "../../composables/useNavLinks";
+import { useTicketAnalysis } from "../../composables/useTicketAnalysis";
 
 const router = useRouter();
 const ticketStore = useTicketStore();
@@ -277,8 +313,42 @@ const form = ref({
 const errors = ref({});
 
 const { navLinks } = useNavLinks();
+const { isAnalyzing, analysisResult, analysisError, analyze } =
+  useTicketAnalysis();
+const categoryApplied = ref(false);
+const priorityApplied = ref(false);
+
+const descriptionText = computed(() =>
+  form.value.description.replace(/<[^>]*>/g, "").trim()
+);
 
 onMounted(() => ticketStore.fetchLookups());
+
+async function runAnalysis() {
+  categoryApplied.value = false;
+  priorityApplied.value = false;
+  await analyze(descriptionText.value);
+}
+
+function applyCategory() {
+  const match = ticketStore.categories.find(
+    (c) => c.name === analysisResult.value.suggestedCategory
+  );
+  if (match) {
+    form.value.categoryId = match.id;
+    categoryApplied.value = true;
+  }
+}
+
+function applyPriority() {
+  const match = ticketStore.priorities.find(
+    (p) => p.name === analysisResult.value.suggestedPriority
+  );
+  if (match) {
+    form.value.priorityId = match.id;
+    priorityApplied.value = true;
+  }
+}
 
 function validate() {
   errors.value = {};
