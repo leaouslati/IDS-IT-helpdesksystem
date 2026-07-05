@@ -61,8 +61,6 @@ The system is built for internal company use only (not a public product), and it
 ### AI Features (powered by Groq / Llama 3)
 - AI ticket categorization: suggests the right category from the ticket description
 - AI priority suggestion: recommends how urgent a ticket is
-- AI suggested replies: helps agents draft troubleshooting responses
-- AI chat assistant: employees can ask IT questions before creating a ticket (answers are based on the knowledge base)
 
 ### Knowledge Base
 - Admins create and approve help articles
