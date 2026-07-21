@@ -125,12 +125,13 @@
 
 <script setup>
 import { ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from "../store/auth";
 import { getRoleDashboard } from "../router";
 import { Eye, EyeOff, AlertTriangle, Lock as LockIcon } from "lucide-vue-next";
 
 const router = useRouter();
+const route = useRoute();
 const authStore = useAuthStore();
 
 const email = ref("");
@@ -147,7 +148,13 @@ async function handleLogin() {
 
   try {
     const role = await authStore.login(email.value, password.value);
-    router.push(getRoleDashboard(role));
+    const redirect = route.query.redirect;
+    // Only follow same-origin relative paths to avoid an open redirect.
+    if (typeof redirect === "string" && redirect.startsWith("/") && !redirect.startsWith("//")) {
+      router.push(redirect);
+    } else {
+      router.push(getRoleDashboard(role));
+    }
   } catch (error) {
     const status = error.response?.status;
     const data = error.response?.data;

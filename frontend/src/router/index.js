@@ -8,7 +8,7 @@ export function getRoleDashboard(role) {
     Agent: "/dashboard/agent",
     Employee: "/dashboard/employee",
   };
-  return map[role] || "/dashboard/admin";
+  return map[role] || "/unauthorized";
 }
 
 const routes = [
@@ -63,12 +63,6 @@ const routes = [
     path: "/forgot-password",
     name: "ForgotPassword",
     component: () => import("../views/ForgotPasswordView.vue"),
-    meta: { requiresGuest: true },
-  },
-  {
-    path: "/reset-password",
-    name: "ResetPassword",
-    component: () => import("../views/ResetPasswordView.vue"),
     meta: { requiresGuest: true },
   },
   {
@@ -140,7 +134,7 @@ router.beforeEach((to, _from, next) => {
   const authStore = useAuthStore();
 
   if (to.meta.requiresAuth && !authStore.isLoggedIn) {
-    next("/login");
+    next({ path: "/login", query: { redirect: to.fullPath } });
     return;
   }
 

@@ -1,10 +1,12 @@
 using backend.Application.DTOs;
 using backend.Application.Interfaces;
 using backend.Domain.Entities;
+using backend.Infrastructure.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace backend.Application.Services
@@ -14,15 +16,25 @@ namespace backend.Application.Services
         private readonly IAuthRepository      _repo;
         private readonly IConfiguration       _configuration;
         private readonly INotificationService _notifications;
+        private readonly IEmailService        _emailService;
 
         private const int MaxFailedAttempts = 5;
         private const int LockoutMinutes    = 15;
 
-        public AuthService(IAuthRepository repo, IConfiguration configuration, INotificationService notifications)
+        private const int OtpExpiryMinutes         = 10;
+        private const int MaxOtpAttempts           = 5;
+        private const int ResetSessionExpiryMinutes = 10;
+
+        public AuthService(
+            IAuthRepository repo,
+            IConfiguration configuration,
+            INotificationService notifications,
+            IEmailService emailService)
         {
             _repo          = repo;
             _configuration = configuration;
             _notifications = notifications;
+            _emailService  = emailService;
         }
 
         public async Task<AuthLoginResult> LoginAsync(LoginRequestDto request)
@@ -96,38 +108,87 @@ namespace backend.Application.Services
             };
         }
 
-        public async Task<string?> ForgotPasswordAsync(string email)
+        public async Task<bool> ForgotPasswordAsync(string email)
         {
-            // We don't expose whether the email exists — always return success to the caller
             var user = await _repo.GetActiveUserWithRoleByEmailAsync(email);
-            if (user == null) return null;
+            if (user == null) return false;
 
             var existing = await _repo.GetActiveTokensForUserAsync(user.Id);
             foreach (var t in existing) t.IsUsed = true;
 
-            var token = Guid.NewGuid().ToString("N");
+            var otp = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+
             _repo.AddPasswordResetToken(new PasswordResetToken
             {
-                UserId    = user.Id,
-                Token     = token,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(15),
-                IsUsed    = false,
-                CreatedAt = DateTime.UtcNow
+                UserId        = user.Id,
+                OtpHash       = BCrypt.Net.BCrypt.HashPassword(otp),
+                OtpExpiresAt  = DateTime.UtcNow.AddMinutes(OtpExpiryMinutes),
+                OtpAttempts   = 0,
+                IsOtpVerified = false,
+                // Placeholder until the OTP is verified — never handed to the client
+                Token         = Guid.NewGuid().ToString("N"),
+                ExpiresAt     = DateTime.UtcNow.AddMinutes(OtpExpiryMinutes),
+                IsUsed        = false,
+                CreatedAt     = DateTime.UtcNow
             });
 
             await _repo.SaveChangesAsync();
-            return token;
+
+            await _emailService.SendEmailAsync(
+                user.Email,
+                "Your password reset code",
+                EmailService.BuildOtpEmailBody(user.FirstName, otp, OtpExpiryMinutes));
+
+            return true;
         }
 
-        public async Task<bool> ResetPasswordAsync(string token, string newPassword)
+        public async Task<VerifyOtpResult> VerifyOtpAsync(string email, string otp)
         {
-            var resetToken = await _repo.GetValidResetTokenAsync(token);
-            if (resetToken == null) return false;
+            var user = await _repo.GetActiveUserWithRoleByEmailAsync(email);
+            if (user == null)
+                return new VerifyOtpResult { Success = false, Error = "Invalid or expired code." };
 
-            resetToken.User.PasswordHash        = BCrypt.Net.BCrypt.HashPassword(newPassword);
-            resetToken.User.FailedLoginAttempts = 0;
-            resetToken.User.LockoutUntil        = null;
-            resetToken.IsUsed                   = true;
+            var record = await _repo.GetActiveOtpForUserAsync(user.Id);
+            if (record == null)
+                return new VerifyOtpResult { Success = false, Error = "Invalid or expired code. Please request a new one." };
+
+            if (record.OtpAttempts >= MaxOtpAttempts)
+            {
+                record.IsUsed = true;
+                await _repo.SaveChangesAsync();
+                return new VerifyOtpResult { Success = false, Error = "Too many incorrect attempts. Please request a new code." };
+            }
+
+            if (!BCrypt.Net.BCrypt.Verify(otp, record.OtpHash))
+            {
+                record.OtpAttempts++;
+                await _repo.SaveChangesAsync();
+                var remaining = MaxOtpAttempts - record.OtpAttempts;
+                return new VerifyOtpResult
+                {
+                    Success           = false,
+                    Error             = "Incorrect code.",
+                    AttemptsRemaining = remaining
+                };
+            }
+
+            record.IsOtpVerified = true;
+            record.Token         = Guid.NewGuid().ToString("N");
+            record.ExpiresAt     = DateTime.UtcNow.AddMinutes(ResetSessionExpiryMinutes);
+            await _repo.SaveChangesAsync();
+
+            return new VerifyOtpResult { Success = true, ResetToken = record.Token };
+        }
+
+        public async Task<bool> ResetPasswordAsync(string resetToken, string newPassword)
+        {
+            var record = await _repo.GetVerifiedResetTokenAsync(resetToken);
+            if (record == null) return false;
+
+            record.User.PasswordHash        = BCrypt.Net.BCrypt.HashPassword(newPassword);
+            record.User.FailedLoginAttempts = 0;
+            record.User.LockoutUntil        = null;
+            record.IsUsed                   = true;
 
             await _repo.SaveChangesAsync();
             return true;

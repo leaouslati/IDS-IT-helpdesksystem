@@ -14,9 +14,23 @@ namespace backend.Application.DTOs
         public string Email { get; set; } = string.Empty;
     }
 
+    public class VerifyOtpRequestDto
+    {
+        public string Email { get; set; } = string.Empty;
+        public string Otp { get; set; } = string.Empty;
+    }
+
+    public class VerifyOtpResult
+    {
+        public bool Success { get; set; }
+        public string? ResetToken { get; set; }
+        public string? Error { get; set; }
+        public int? AttemptsRemaining { get; set; }
+    }
+
     public class ResetPasswordRequestDto
     {
-        public string Token { get; set; } = string.Empty;
+        public string ResetToken { get; set; } = string.Empty;
         public string NewPassword { get; set; } = string.Empty;
     }
 }

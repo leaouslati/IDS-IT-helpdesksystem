@@ -8,7 +8,8 @@ namespace backend.Application.Interfaces
         Task<User?> GetActiveUserWithRoleByEmailAsync(string email);
         Task<List<PasswordResetToken>> GetActiveTokensForUserAsync(int userId);
         void AddPasswordResetToken(PasswordResetToken token);
-        Task<PasswordResetToken?> GetValidResetTokenAsync(string token);
+        Task<PasswordResetToken?> GetActiveOtpForUserAsync(int userId);
+        Task<PasswordResetToken?> GetVerifiedResetTokenAsync(string resetToken);
         Task SaveChangesAsync();
     }
 }

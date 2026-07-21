@@ -61,18 +61,10 @@
       </div>
     </div>
 
-    <!-- Preview modal -->
-    <AttachmentPreviewModal
-      :open="previewOpen"
-      :attachment="previewAttachment"
-      :ticketId="ticketId"
-      @close="previewOpen = false"
-    />
   </div>
 </template>
 
 <script setup>
-import { ref } from "vue";
 import {
   FileImage,
   FileText,
@@ -83,19 +75,41 @@ import {
   Eye,
 } from "lucide-vue-next";
 import api from "../../api/axios";
-import AttachmentPreviewModal from "./AttachmentPreviewModal.vue";
 
 const props = defineProps({
   attachments: { type: Array, default: () => [] },
   ticketId: { type: Number, default: null },
 });
 
-const previewOpen = ref(false);
-const previewAttachment = ref(null);
-
-function openPreview(att) {
-  previewAttachment.value = att;
-  previewOpen.value = true;
+async function openPreview(att) {
+  // Open the tab synchronously (within the click handler) so popup blockers
+  // don't treat the later async navigation as an unsolicited popup. We need
+  // a live reference to navigate it once the blob loads, so "noopener" (which
+  // makes window.open return null) can't be used here.
+  const newTab = window.open("", "_blank");
+  if (props.ticketId && att.id) {
+    try {
+      const res = await api.get(
+        `/ticket/${props.ticketId}/attachments/${att.id}/preview`,
+        { responseType: "blob" }
+      );
+      const url = URL.createObjectURL(res.data);
+      if (newTab) newTab.location.href = url;
+      // Delay revocation so the new tab has time to load the blob
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      return;
+    } catch {
+      // fall through to direct URL fallback
+    }
+  }
+  const path = att.filePath || att.fileUrl || "";
+  const fallbackUrl = path
+    ? path.startsWith("http")
+      ? path
+      : `https://localhost:7091${path}`
+    : "";
+  if (newTab && fallbackUrl) newTab.location.href = fallbackUrl;
+  else if (newTab) newTab.close();
 }
 
 async function downloadFile(att) {

@@ -32,11 +32,22 @@ namespace backend.Infrastructure.Repositories
         public void AddPasswordResetToken(PasswordResetToken token) =>
             _context.PasswordResetTokens.Add(token);
 
-        public async Task<PasswordResetToken?> GetValidResetTokenAsync(string token) =>
+        public async Task<PasswordResetToken?> GetActiveOtpForUserAsync(int userId) =>
+            await _context.PasswordResetTokens
+                .Where(t =>
+                    t.UserId == userId &&
+                    !t.IsUsed &&
+                    !t.IsOtpVerified &&
+                    t.OtpExpiresAt > DateTime.UtcNow)
+                .OrderByDescending(t => t.CreatedAt)
+                .FirstOrDefaultAsync();
+
+        public async Task<PasswordResetToken?> GetVerifiedResetTokenAsync(string resetToken) =>
             await _context.PasswordResetTokens
                 .Include(t => t.User)
                 .FirstOrDefaultAsync(t =>
-                    t.Token == token &&
+                    t.Token == resetToken &&
+                    t.IsOtpVerified &&
                     !t.IsUsed &&
                     t.ExpiresAt > DateTime.UtcNow);
 

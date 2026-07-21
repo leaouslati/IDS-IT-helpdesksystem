@@ -90,7 +90,71 @@ The system is built for internal company use only (not a public product), and it
 
 ---
 
-## 3. Tech Stack
+## 3. Screenshots
+
+### Login
+The sign-in screen, common to all roles.
+
+![Login](screenshots/login.png)
+
+### Employee Dashboard
+Personal ticket stats (open, in progress, resolved, total submitted), a list of recent tickets, and quick links to submit a ticket or check status.
+
+![Employee Dashboard](screenshots/employee-dashboard.png)
+
+### Agent Dashboard
+Tickets assigned to the agent, in-progress and escalated counts, and quick actions to update status, add comments, or escalate a ticket.
+
+![Agent Dashboard](screenshots/agent-dashboard.png)
+
+### Manager Dashboard
+Unassigned tickets awaiting action, resolved-this-week and average resolution time stats, escalated tickets needing review, agent availability, and agent performance charts.
+
+![Manager Dashboard](screenshots/manager-dashboard.png)
+
+### Manager Team Tickets
+Department-wide ticket list a manager uses to review, filter, and assign tickets to agents.
+
+![Manager Team Tickets](screenshots/team-tickets.png)
+
+### Admin Dashboard
+System-wide overview: total users, total tickets, open tickets, and tickets resolved today, plus ticket trend, category, and priority charts, recent activity, and agent workload.
+
+![Admin Dashboard](screenshots/admin-dashboard.png)
+
+### Admin User Management
+Where admins create, edit, and deactivate accounts and assign roles and departments.
+
+![Admin User Management](screenshots/user-management.png)
+
+### Admin System Management
+System health at a glance (user/ticket counts, storage, app version, database) plus the company holiday calendar.
+
+![Admin System Management](screenshots/system-management.png)
+
+### Create Ticket
+The form used to submit a new ticket, with AI-assisted category/priority suggestions and file attachments.
+
+![Create Ticket](screenshots/create-ticket.png)
+
+### Ticket Details
+A single ticket's description, status, assignment, attachments, and comment thread.
+
+![Ticket Details](screenshots/ticket-details.png)
+
+### Ticket Activity History
+The full audit trail of everything that happened on a ticket, from creation to resolution.
+
+![Ticket Activity History](screenshots/ticket-activity-history.png)
+
+### Notifications
+The notification center where users see updates about tickets they care about.
+
+![Notifications](screenshots/notifications.png)
+
+---
+
+## 4. Tech Stack
 
 ### Backend
 | Technology | What it does |
@@ -128,7 +192,7 @@ The system is built for internal company use only (not a public product), and it
 
 ---
 
-## 4. Project Structure
+## 5. Project Structure
 
 ```
 /
@@ -165,7 +229,7 @@ The system is built for internal company use only (not a public product), and it
 
 ---
 
-## 5. Database Schema
+## 6. Database Schema
 
 | Table | Description |
 |---|---|
@@ -186,7 +250,7 @@ A full schema script and ER diagrams are available in [`schema and diagrams/`](s
 
 ---
 
-## 6. How the Ticket Workflow Works
+## 7. How the Ticket Workflow Works
 
 1. An employee logs in and describes their IT problem in a new ticket. The AI suggests a category and priority — they can accept or change it.
 2. The manager receives a notification and sees the new ticket in their dashboard. They review it and assign it to an available agent (the system won't let them assign to an agent who already has 3 open tickets).
@@ -197,7 +261,7 @@ A full schema script and ER diagrams are available in [`schema and diagrams/`](s
 
 ---
 
-## 7. Getting Started (Setup Instructions)
+## 8. Getting Started (Setup Instructions)
 
 ### Prerequisites
 - .NET 10 SDK
@@ -236,13 +300,13 @@ A full schema script and ER diagrams are available in [`schema and diagrams/`](s
 
 ---
 
-## 8. API Documentation
+## 9. API Documentation
 
 Once the backend is running, a full interactive Swagger UI is available at `/swagger` (e.g. `https://localhost:7091/swagger`), where every endpoint can be viewed and tested directly from the browser. All endpoints (except login) require a JWT token — get one by calling `POST /api/auth/login` with valid credentials, then include the returned token as a `Bearer` token in the `Authorization` header of subsequent requests. Endpoints are grouped by controller/tag: Auth, Ticket, Admin, AI, Dashboard, Reports, Notification, Profile, Holiday, and Lookup.
 
 ---
 
-## 9. Environment Variables Reference
+## 10. Environment Variables Reference
 
 | Key | Description | Where to get it |
 |---|---|---|
@@ -260,7 +324,7 @@ Once the backend is running, a full interactive Swagger UI is available at `/swa
 
 ---
 
-## 10. Security Notes
+## 11. Security Notes
 
 - No self-registration — accounts are admin-created only, preventing unauthorized access
 - Passwords are never stored as plain text — BCrypt hashing with salt is used instead
@@ -272,7 +336,7 @@ Once the backend is running, a full interactive Swagger UI is available at `/swa
 
 ---
 
-## 11. Known Limitations / Future Improvements
+## 12. Known Limitations / Future Improvements
 
 - AI features use Groq's free tier, which has rate limits — a paid API plan would be more reliable for production use
 - File storage is local to the server — for production, a cloud storage service like Azure Blob Storage would be more appropriate
@@ -282,7 +346,7 @@ Once the backend is running, a full interactive Swagger UI is available at `/swa
 
 ---
 
-## 12. Acknowledgements
+## 13. Acknowledgements
 
 - Developed as part of the IDS Academy Full Stack Web Development Internship
 - Supervisor: Suha Mneimneh

@@ -55,24 +55,38 @@ namespace backend.Presentation.Controllers
             if (string.IsNullOrEmpty(request.Email))
                 return BadRequest(new { message = "Email is required." });
 
-            var token = await _authService.ForgotPasswordAsync(request.Email);
+            var sent = await _authService.ForgotPasswordAsync(request.Email);
 
-            if (token == null)
+            if (!sent)
                 return NotFound(new { message = "No active account found with that email address." });
 
-            return Ok(new { resetToken = token, expiresMinutes = 15 });
+            return Ok(new { message = "A verification code has been sent to your email.", expiresMinutes = 10 });
+        }
+
+        [HttpPost("verify-otp")]
+        public async Task<IActionResult> VerifyOtp([FromBody] VerifyOtpRequestDto request)
+        {
+            if (string.IsNullOrEmpty(request.Email) || string.IsNullOrEmpty(request.Otp))
+                return BadRequest(new { message = "Email and code are required." });
+
+            var result = await _authService.VerifyOtpAsync(request.Email, request.Otp);
+
+            if (!result.Success)
+                return BadRequest(new { message = result.Error, attemptsRemaining = result.AttemptsRemaining });
+
+            return Ok(new { resetToken = result.ResetToken, expiresMinutes = 10 });
         }
 
         [HttpPost("reset-password")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequestDto request)
         {
-            if (string.IsNullOrEmpty(request.Token) || string.IsNullOrEmpty(request.NewPassword))
-                return BadRequest(new { message = "Token and new password are required." });
+            if (string.IsNullOrEmpty(request.ResetToken) || string.IsNullOrEmpty(request.NewPassword))
+                return BadRequest(new { message = "Reset token and new password are required." });
 
-            var success = await _authService.ResetPasswordAsync(request.Token, request.NewPassword);
+            var success = await _authService.ResetPasswordAsync(request.ResetToken, request.NewPassword);
 
             if (!success)
-                return BadRequest(new { message = "Reset link is invalid or has expired." });
+                return BadRequest(new { message = "Your session has expired. Please start over." });
 
             return Ok(new { message = "Password reset successfully." });
         }

@@ -181,6 +181,22 @@ using (var scope = app.Services.CreateScope())
         )");
 
     db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('PasswordResetTokens') AND name = 'OtpHash')
+        ALTER TABLE PasswordResetTokens ADD OtpHash nvarchar(200) NOT NULL DEFAULT ''");
+
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('PasswordResetTokens') AND name = 'OtpExpiresAt')
+        ALTER TABLE PasswordResetTokens ADD OtpExpiresAt datetime2 NOT NULL DEFAULT '1900-01-01'");
+
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('PasswordResetTokens') AND name = 'OtpAttempts')
+        ALTER TABLE PasswordResetTokens ADD OtpAttempts int NOT NULL DEFAULT 0");
+
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('PasswordResetTokens') AND name = 'IsOtpVerified')
+        ALTER TABLE PasswordResetTokens ADD IsOtpVerified bit NOT NULL DEFAULT 0");
+
+    db.Database.ExecuteSqlRaw(@"
         IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Tickets') AND name = 'EscalatedByUserId')
         ALTER TABLE Tickets ADD EscalatedByUserId int NULL");
 
